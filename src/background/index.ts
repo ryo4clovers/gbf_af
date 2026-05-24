@@ -3,6 +3,7 @@ import { artifactListResponseSchema } from "../api/artifactListSchema";
 import type { ArtifactListResponse } from "../api/artifactListTypes";
 import type { Artifact } from "../domain/artifact";
 import { normalizeArtifact } from "../domain/normalizeArtifact";
+import type { ScanSession } from "../domain/scanSession";
 import type {
   ErrorResponse,
   ExtensionMessage,
@@ -14,13 +15,22 @@ import {
   type ScanErrorCode,
 } from "../state/appState";
 import {
+  backfillLegacyArtifactPresence,
   clearAllArtifacts,
   clearArtifactUserReviews,
+  createScanSession,
+  finishActiveScanSession,
+  getActiveScanSession,
   getAllArtifacts,
+  getArtifactPresenceMap,
   getArtifactUserReviews,
+  getLatestScanSession,
   getScanMetadata,
+  markMissingArtifactsPossiblyDeleted,
   saveArtifactUserReview,
   saveScannedArtifacts,
+  updateArtifactPresence,
+  updateScanSession,
 } from "../storage/artifactIndexedDb";
 import {
   clearArtifactsInMemory,
@@ -95,6 +105,10 @@ async function handleMessage(
       return saveArtifactUserReviewResponse(message.review);
     case "CLEAR_ARTIFACT_USER_REVIEWS":
       return clearArtifactUserReviewsResponse();
+    case "GET_SCAN_SESSIONS":
+      return getScanSessionsResponse();
+    case "GET_ARTIFACT_PRESENCE":
+      return getArtifactPresenceResponse();
     case "OPEN_DASHBOARD":
       await chrome.tabs.create({
         url: chrome.runtime.getURL("dashboard.html"),
@@ -143,9 +157,40 @@ async function startObserving(): Promise<ExtensionResponse> {
     );
   }
 
+  const startedAt = new Date().toISOString();
+  const session: ScanSession = {
+    id: createScanSessionId(startedAt),
+    startedAt,
+    observedPages: [],
+    observedArtifactCount: 0,
+    isFullScan: false,
+  };
+
+  try {
+    await createScanSession(session);
+  } catch (error) {
+    logDebugError("Could not create scan session", error);
+    return scanErrorResponse(
+      "storage_failed",
+      "Could not create scan session.",
+    );
+  }
+
   currentScanState = {
     ...currentScanState,
     status: "observing",
+    currentPage: null,
+    lastPage: null,
+    totalCount: null,
+    lastScannedPage: null,
+    lastScanArtifactCount: 0,
+    scannedPages: [],
+    activeScanSessionId: session.id,
+    latestScanSessionId: session.id,
+    observedPages: [],
+    expectedLastPage: null,
+    observedArtifactCount: 0,
+    isFullScan: false,
     errorCode: null,
     errorMessage: null,
   };
@@ -178,12 +223,53 @@ async function stopObserving(): Promise<ExtensionResponse> {
     logDebugError("Could not stop observer", error, { tabId: tab.id });
   }
 
-  currentScanState = {
+  let finishedSession: ScanSession | null = null;
+
+  try {
+    const finishedAt = new Date().toISOString();
+    finishedSession = await finishActiveScanSession(finishedAt);
+
+    if (finishedSession?.isFullScan) {
+      const backfillResult = await backfillLegacyArtifactPresence(finishedAt);
+      console.info("[GBF Artifact Manager] legacy presence backfill", {
+        artifactCount: backfillResult.artifactCount,
+        existingPresenceCount: backfillResult.existingPresenceCount,
+        createdPresenceCount: backfillResult.createdPresenceCount,
+      });
+
+      const missingResult = await markMissingArtifactsPossiblyDeleted(
+        finishedSession.id,
+      );
+      console.info("[GBF Artifact Manager] full scan lifecycle marking", {
+        sessionId: finishedSession.id,
+        markedPossiblyDeletedCount: missingResult.markedPossiblyDeletedCount,
+      });
+    }
+  } catch (error) {
+    logDebugError("Could not finish scan session", error);
+    return scanErrorResponse(
+      "storage_failed",
+      "Could not finish scan session.",
+    );
+  }
+
+  currentScanState = await hydratePersistedScanState({
     ...currentScanState,
-    status: "idle",
+    status: "stopped",
+    activeScanSessionId: null,
+    latestScanSessionId:
+      finishedSession?.id ?? currentScanState.latestScanSessionId,
+    observedPages:
+      finishedSession?.observedPages ?? currentScanState.observedPages,
+    expectedLastPage:
+      finishedSession?.expectedLastPage ?? currentScanState.expectedLastPage,
+    observedArtifactCount:
+      finishedSession?.observedArtifactCount ??
+      currentScanState.observedArtifactCount,
+    isFullScan: finishedSession?.isFullScan ?? currentScanState.isFullScan,
     errorCode: null,
     errorMessage: null,
-  };
+  });
   console.info("[GBF Artifact Manager] observer stop", { tabId: tab.id });
 
   return {
@@ -210,6 +296,7 @@ async function handleObservedArtifactList(
   }
 
   const artifactList = artifactListResult.artifactList;
+  const activeSession = await ensureActiveScanSession(scannedAt);
   const artifacts = artifactList.list.map((raw) =>
     normalizeArtifact(raw, scannedAt),
   );
@@ -222,6 +309,12 @@ async function handleObservedArtifactList(
   if (!persistenceResult.ok) {
     return persistenceResult;
   }
+
+  await updateArtifactPresence(artifacts, activeSession.id, scannedAt);
+  const updatedSession = await updateSessionForObservedPage(
+    activeSession,
+    artifactList,
+  );
 
   const storedArtifactCount = saveSuccessfulScanInMemory(
     artifacts,
@@ -238,11 +331,14 @@ async function handleObservedArtifactList(
     persistedArtifactCount: persistenceResult.persistedArtifactCount,
     lastScannedPage: artifactList.current,
     lastScanArtifactCount: artifacts.length,
-    scannedPages: addScannedPage(
-      currentScanState.scannedPages,
-      artifactList.current,
-    ),
+    scannedPages: updatedSession.observedPages,
     lastScannedAt: scannedAt,
+    activeScanSessionId: updatedSession.id,
+    latestScanSessionId: updatedSession.id,
+    observedPages: updatedSession.observedPages,
+    expectedLastPage: updatedSession.expectedLastPage ?? null,
+    observedArtifactCount: updatedSession.observedArtifactCount,
+    isFullScan: updatedSession.isFullScan,
     errorCode: null,
     errorMessage: null,
   };
@@ -403,6 +499,50 @@ async function clearArtifactUserReviewsResponse(): Promise<ExtensionResponse> {
   }
 }
 
+async function getScanSessionsResponse(): Promise<ExtensionResponse> {
+  try {
+    const [activeSession, latestSession] = await Promise.all([
+      getActiveScanSession(),
+      getLatestScanSession(),
+    ]);
+    currentScanState = await hydratePersistedScanState(currentScanState);
+
+    return {
+      ok: true,
+      type: "SCAN_SESSIONS",
+      activeSession,
+      latestSession,
+      scan: currentScanState,
+    };
+  } catch (error) {
+    logDebugError("Could not read scan sessions", error);
+    return {
+      ok: false,
+      type: "ERROR",
+      message: "Could not read scan sessions.",
+      errorCode: "storage_failed",
+    };
+  }
+}
+
+async function getArtifactPresenceResponse(): Promise<ExtensionResponse> {
+  try {
+    return {
+      ok: true,
+      type: "ARTIFACT_PRESENCE",
+      presence: await getArtifactPresenceMap(),
+    };
+  } catch (error) {
+    logDebugError("Could not read artifact presence", error);
+    return {
+      ok: false,
+      type: "ERROR",
+      message: "Could not read artifact presence.",
+      errorCode: "storage_failed",
+    };
+  }
+}
+
 function validateObservedArtifactList(payload: unknown):
   | {
       ok: true;
@@ -480,6 +620,47 @@ async function persistScannedArtifacts(
   }
 }
 
+async function ensureActiveScanSession(
+  startedAt: string,
+): Promise<ScanSession> {
+  const activeSession = await getActiveScanSession();
+
+  if (activeSession !== null) {
+    return activeSession;
+  }
+
+  const session: ScanSession = {
+    id: createScanSessionId(startedAt),
+    startedAt,
+    observedPages: [],
+    observedArtifactCount: 0,
+    isFullScan: false,
+  };
+
+  await createScanSession(session);
+  return session;
+}
+
+async function updateSessionForObservedPage(
+  session: ScanSession,
+  artifactList: ArtifactListResponse,
+): Promise<ScanSession> {
+  const presenceMap = await getArtifactPresenceMap();
+  const observedArtifactCount = Object.values(presenceMap).filter(
+    (presence) => presence.lastSeenSessionId === session.id,
+  ).length;
+  const updatedSession: ScanSession = {
+    ...session,
+    observedPages: addScannedPage(session.observedPages, artifactList.current),
+    expectedLastPage: artifactList.last,
+    observedArtifactCount,
+    isFullScan: false,
+  };
+
+  await updateScanSession(updatedSession);
+  return updatedSession;
+}
+
 function isGranblueFantasyTab(tab: chrome.tabs.Tab): boolean {
   if (tab.url === undefined) {
     return false;
@@ -495,15 +676,31 @@ function isGranblueFantasyTab(tab: chrome.tabs.Tab): boolean {
 async function hydratePersistedScanState(
   scanState: typeof currentScanState,
 ): Promise<typeof currentScanState> {
-  const [artifacts, metadata] = await Promise.all([
-    getAllArtifacts(),
-    getScanMetadata(),
-  ]);
+  const [artifacts, metadata, activeSession, latestSession] = await Promise.all(
+    [
+      getAllArtifacts(),
+      getScanMetadata(),
+      getActiveScanSession(),
+      getLatestScanSession(),
+    ],
+  );
+  const session = activeSession ?? latestSession;
+  const sessionState = {
+    activeScanSessionId: activeSession?.id ?? null,
+    latestScanSessionId: latestSession?.id ?? null,
+    observedPages: session?.observedPages ?? scanState.observedPages,
+    expectedLastPage:
+      session?.expectedLastPage ?? scanState.expectedLastPage ?? null,
+    observedArtifactCount:
+      session?.observedArtifactCount ?? scanState.observedArtifactCount,
+    isFullScan: session?.isFullScan ?? scanState.isFullScan,
+  };
 
   if (metadata === null) {
     return {
       ...scanState,
       persistedArtifactCount: artifacts.length,
+      ...sessionState,
     };
   }
 
@@ -513,7 +710,16 @@ async function hydratePersistedScanState(
     lastScannedPage: metadata.scannedPage,
     lastScanArtifactCount: metadata.artifactCount,
     lastScannedAt: metadata.scannedAt,
+    ...sessionState,
   };
+}
+
+function createScanSessionId(dateText: string): string {
+  if (typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `scan-${dateText}-${Math.random().toString(16).slice(2)}`;
 }
 
 async function getActiveTab(): Promise<chrome.tabs.Tab | null> {

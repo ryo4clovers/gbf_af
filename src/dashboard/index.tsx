@@ -6,6 +6,7 @@ import type {
   ArtifactUserRating,
   ArtifactUserReview,
 } from "../domain/artifactUserReview";
+import type { ArtifactPresence } from "../domain/scanSession";
 import { sendRuntimeMessage } from "../shared/chromeMessages";
 import { useAppStore } from "../state/appState";
 import "./style.css";
@@ -13,6 +14,7 @@ import "./style.css";
 type LockedFilter = "all" | "locked" | "unlocked";
 type EquippedFilter = "all" | "equipped" | "unequipped";
 type RatingFilter = "all" | "unrated" | "1" | "2" | "3" | "4" | "5";
+type LifecycleFilter = "all" | "active" | "possiblyDeleted";
 type SortKey = "totalScore" | "ownedId" | "name" | "rating";
 type SortDirection = "asc" | "desc";
 
@@ -23,6 +25,7 @@ type ArtifactFilters = {
   locked: LockedFilter;
   equipped: EquippedFilter;
   rating: RatingFilter;
+  lifecycle: LifecycleFilter;
 };
 
 type ArtifactSort = {
@@ -37,11 +40,13 @@ const initialFilters: ArtifactFilters = {
   locked: "all",
   equipped: "all",
   rating: "all",
+  lifecycle: "all",
 };
 
 type ReviewedArtifactRow = {
   artifact: Artifact;
   review: ArtifactUserReview | null;
+  presence: ArtifactPresence | null;
 };
 
 function Dashboard() {
@@ -49,6 +54,9 @@ function Dashboard() {
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [reviewsByOwnedId, setReviewsByOwnedId] = useState<
     Record<number, ArtifactUserReview>
+  >({});
+  const [presenceByOwnedId, setPresenceByOwnedId] = useState<
+    Record<number, ArtifactPresence>
   >({});
   const [filters, setFilters] = useState<ArtifactFilters>(initialFilters);
   const [sort, setSort] = useState<ArtifactSort>({
@@ -60,6 +68,7 @@ function Dashboard() {
   const artifactRows = artifacts.map((artifact) => ({
     artifact,
     review: reviewsByOwnedId[artifact.ownedId] ?? null,
+    presence: presenceByOwnedId[artifact.ownedId] ?? null,
   }));
   const filteredRows = getFilteredAndSortedArtifactRows(
     artifactRows,
@@ -73,10 +82,12 @@ function Dashboard() {
     setIsLoading(true);
     setStatusMessage("Loading artifacts...");
 
-    const [artifactResponse, reviewResponse] = await Promise.all([
-      sendRuntimeMessage({ type: "GET_STORED_ARTIFACTS" }),
-      sendRuntimeMessage({ type: "GET_ARTIFACT_USER_REVIEWS" }),
-    ]);
+    const [artifactResponse, reviewResponse, presenceResponse] =
+      await Promise.all([
+        sendRuntimeMessage({ type: "GET_STORED_ARTIFACTS" }),
+        sendRuntimeMessage({ type: "GET_ARTIFACT_USER_REVIEWS" }),
+        sendRuntimeMessage({ type: "GET_ARTIFACT_PRESENCE" }),
+      ]);
 
     if (!artifactResponse.ok) {
       if (artifactResponse.scan !== undefined) {
@@ -103,6 +114,16 @@ function Dashboard() {
       setReviewsByOwnedId(indexReviewsByOwnedId(reviewResponse.reviews));
     }
 
+    if (!presenceResponse.ok) {
+      setStatusMessage(presenceResponse.message);
+      setIsLoading(false);
+      return;
+    }
+
+    if (presenceResponse.type === "ARTIFACT_PRESENCE") {
+      setPresenceByOwnedId(presenceResponse.presence);
+    }
+
     setStatusMessage(
       `Loaded ${artifactResponse.type === "STORED_ARTIFACTS" ? artifactResponse.artifactCount : 0} stored artifacts.`,
     );
@@ -124,6 +145,7 @@ function Dashboard() {
         filteredRows.map((row) => ({
           artifact: row.artifact,
           review: row.review ?? undefined,
+          presence: row.presence ?? undefined,
         })),
       ),
       createArtifactCsvFileName(new Date()),
@@ -427,6 +449,23 @@ function ArtifactControls({
         </label>
 
         <label>
+          Lifecycle
+          <select
+            value={filters.lifecycle}
+            onChange={(event) =>
+              onFiltersChange({
+                ...filters,
+                lifecycle: event.currentTarget.value as LifecycleFilter,
+              })
+            }
+          >
+            <option value="all">All</option>
+            <option value="active">Active</option>
+            <option value="possiblyDeleted">Possibly deleted</option>
+          </select>
+        </label>
+
+        <label>
           Sort
           <select
             value={`${sort.key}:${sort.direction}`}
@@ -484,6 +523,8 @@ function ArtifactTable({
             <th>Total score</th>
             <th>Rating</th>
             <th>Memo</th>
+            <th>Last seen</th>
+            <th>Possibly deleted</th>
             <th>Locked</th>
             <th>Equipped</th>
             <th>Skills</th>
@@ -536,6 +577,8 @@ function ArtifactTable({
                     }
                   />
                 </td>
+                <td>{row.presence?.lastSeenAt ?? "-"}</td>
+                <td>{row.presence?.isPossiblyDeleted ? "Yes" : "No"}</td>
                 <td>{artifact.isLocked ? "Yes" : "No"}</td>
                 <td>{artifact.equippedCharacter?.name ?? "-"}</td>
                 <td>
@@ -615,6 +658,17 @@ function matchesFilters(
     filters.rating !== "all" &&
     filters.rating !== "unrated" &&
     review?.rating !== Number.parseInt(filters.rating, 10)
+  ) {
+    return false;
+  }
+
+  if (filters.lifecycle === "active" && row.presence?.isPossiblyDeleted) {
+    return false;
+  }
+
+  if (
+    filters.lifecycle === "possiblyDeleted" &&
+    !row.presence?.isPossiblyDeleted
   ) {
     return false;
   }

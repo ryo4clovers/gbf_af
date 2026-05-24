@@ -1,9 +1,11 @@
 import type { Artifact, ArtifactSkill } from "../domain/artifact";
 import type { ArtifactUserReview } from "../domain/artifactUserReview";
+import type { ArtifactPresence } from "../domain/scanSession";
 
 export type ArtifactCsvRow = {
   artifact: Artifact;
   review?: ArtifactUserReview | undefined;
+  presence?: ArtifactPresence | undefined;
 };
 
 const CSV_HEADERS = [
@@ -40,6 +42,9 @@ const CSV_HEADERS = [
   "skill4Category",
   "rating",
   "memo",
+  "lastSeenAt",
+  "isPossiblyDeleted",
+  "missingSinceSessionId",
 ];
 
 export function convertArtifactsToCsv(artifacts: Artifact[]): string {
@@ -77,6 +82,7 @@ function getArtifactCsvValue(
   header: string,
 ): string | number | boolean | null {
   const { artifact, review } = row;
+  const { presence } = row;
 
   switch (header) {
     case "ownedId":
@@ -113,6 +119,12 @@ function getArtifactCsvValue(
       return review?.rating ?? 0;
     case "memo":
       return review?.memo ?? null;
+    case "lastSeenAt":
+      return presence?.lastSeenAt ?? null;
+    case "isPossiblyDeleted":
+      return presence?.isPossiblyDeleted ?? false;
+    case "missingSinceSessionId":
+      return presence?.missingSinceSessionId ?? null;
     default:
       return getSkillCsvValue(artifact, header);
   }

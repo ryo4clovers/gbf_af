@@ -13,7 +13,7 @@ import "./style.css";
 function Popup() {
   const { mode, scan, setMode, setScanState } = useAppStore();
   const [statusMessage, setStatusMessage] = useState("Ready.");
-  const isObserving = scan.status === "observing";
+  const hasActiveSession = scan.activeScanSessionId !== null;
 
   useEffect(() => {
     sendRuntimeMessage({ type: "GET_APP_STATE" }).then((response) => {
@@ -158,16 +158,28 @@ function Popup() {
           <strong>{formatScanStatus(scan.status)}</strong>
         </div>
         <div>
-          <span>Scanned page</span>
+          <span>Latest page</span>
           <strong>{scan.lastScannedPage ?? "-"}</strong>
         </div>
         <div>
-          <span>Current count</span>
-          <strong>{scan.lastScanArtifactCount}</strong>
+          <span>Observed pages</span>
+          <strong>
+            {scan.observedPages.length > 0
+              ? scan.observedPages.join(", ")
+              : "-"}
+          </strong>
         </div>
         <div>
-          <span>Scanned pages</span>
-          <strong>{scan.scannedPages.length}</strong>
+          <span>Expected last</span>
+          <strong>{scan.expectedLastPage ?? "-"}</strong>
+        </div>
+        <div>
+          <span>Full scan</span>
+          <strong>{scan.isFullScan ? "Yes" : "No"}</strong>
+        </div>
+        <div>
+          <span>Observed artifacts</span>
+          <strong>{scan.observedArtifactCount}</strong>
         </div>
         <div>
           <span>Persisted</span>
@@ -176,16 +188,28 @@ function Popup() {
       </section>
 
       <section className="actions" aria-label="Actions">
-        <button type="button" onClick={startObserving} disabled={isObserving}>
+        <button
+          type="button"
+          onClick={startObserving}
+          disabled={hasActiveSession}
+        >
           Start Observing
         </button>
-        <button type="button" onClick={stopObserving} disabled={!isObserving}>
+        <button
+          type="button"
+          onClick={stopObserving}
+          disabled={!hasActiveSession}
+        >
           Stop Observing
         </button>
         <button type="button" onClick={openDashboard}>
           Open Dashboard
         </button>
-        <button type="button" onClick={clearStoredData} disabled={isObserving}>
+        <button
+          type="button"
+          onClick={clearStoredData}
+          disabled={hasActiveSession}
+        >
           Clear Stored Data
         </button>
       </section>
@@ -226,6 +250,8 @@ function formatScanStatus(status: ScanStatus) {
       return "Observing";
     case "captured":
       return "Captured";
+    case "stopped":
+      return "Stopped";
     case "success":
       return "Success";
     case "error":

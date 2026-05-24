@@ -1,5 +1,6 @@
 import type { Artifact } from "../domain/artifact";
 import type { ArtifactUserReview } from "../domain/artifactUserReview";
+import type { ArtifactPresence, ScanSession } from "../domain/scanSession";
 import type { AppMode, ScanErrorCode, ScanState } from "../state/appState";
 
 export type ExtensionMessage =
@@ -15,6 +16,8 @@ export type ExtensionMessage =
   | GetArtifactUserReviewsMessage
   | SaveArtifactUserReviewMessage
   | ClearArtifactUserReviewsMessage
+  | GetScanSessionsMessage
+  | GetArtifactPresenceMessage
   | OpenDashboardMessage
   | GetPageInfoMessage;
 
@@ -29,6 +32,8 @@ export type ExtensionResponse =
   | ArtifactUserReviewsResponse
   | SaveArtifactUserReviewResponse
   | ClearArtifactUserReviewsResponse
+  | ScanSessionsResponse
+  | ArtifactPresenceResponse
   | OpenDashboardResponse
   | ErrorResponse;
 
@@ -84,6 +89,14 @@ export type SaveArtifactUserReviewMessage = {
 
 export type ClearArtifactUserReviewsMessage = {
   type: "CLEAR_ARTIFACT_USER_REVIEWS";
+};
+
+export type GetScanSessionsMessage = {
+  type: "GET_SCAN_SESSIONS";
+};
+
+export type GetArtifactPresenceMessage = {
+  type: "GET_ARTIFACT_PRESENCE";
 };
 
 export type OpenDashboardMessage = {
@@ -164,6 +177,20 @@ export type SaveArtifactUserReviewResponse = {
 export type ClearArtifactUserReviewsResponse = {
   ok: true;
   type: "CLEAR_ARTIFACT_USER_REVIEWS_RESULT";
+};
+
+export type ScanSessionsResponse = {
+  ok: true;
+  type: "SCAN_SESSIONS";
+  activeSession: ScanSession | null;
+  latestSession: ScanSession | null;
+  scan: ScanState;
+};
+
+export type ArtifactPresenceResponse = {
+  ok: true;
+  type: "ARTIFACT_PRESENCE";
+  presence: Record<number, ArtifactPresence>;
 };
 
 export type OpenDashboardResponse = {

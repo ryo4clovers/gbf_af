@@ -7,6 +7,7 @@ export type ScanStatus =
   | "scanning"
   | "observing"
   | "captured"
+  | "stopped"
   | "success"
   | "error";
 
@@ -30,6 +31,12 @@ export type ScanState = {
   lastScanArtifactCount: number;
   scannedPages: number[];
   lastScannedAt: string | null;
+  activeScanSessionId: string | null;
+  latestScanSessionId: string | null;
+  observedPages: number[];
+  expectedLastPage: number | null;
+  observedArtifactCount: number;
+  isFullScan: boolean;
   errorCode: ScanErrorCode | null;
   errorMessage: string | null;
 };
@@ -53,6 +60,12 @@ export const initialScanState: ScanState = {
   lastScanArtifactCount: 0,
   scannedPages: [],
   lastScannedAt: null,
+  activeScanSessionId: null,
+  latestScanSessionId: null,
+  observedPages: [],
+  expectedLastPage: null,
+  observedArtifactCount: 0,
+  isFullScan: false,
   errorCode: null,
   errorMessage: null,
 };
