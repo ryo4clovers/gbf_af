@@ -72,6 +72,36 @@ chrome.runtime.onMessage.addListener(
       return false;
     }
 
+    if (message.type === "START_DISPLAY_MODE") {
+      postObserverControlMessage("start");
+      sendResponse({
+        ok: true,
+        type: "DISPLAY_STATUS",
+        message: "Display mode started.",
+        display: {
+          isEnabled: true,
+          itemCount: 0,
+          items: [],
+        },
+      });
+      return false;
+    }
+
+    if (message.type === "STOP_DISPLAY_MODE") {
+      postObserverControlMessage("stop");
+      sendResponse({
+        ok: true,
+        type: "DISPLAY_STATUS",
+        message: "Display mode stopped.",
+        display: {
+          isEnabled: false,
+          itemCount: 0,
+          items: [],
+        },
+      });
+      return false;
+    }
+
     if (message.type === "GET_PAGE_INFO") {
       const url = window.location.href;
       const artifactPage = detectCurrentArtifactPage(url);

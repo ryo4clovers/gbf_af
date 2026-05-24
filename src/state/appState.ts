@@ -1,6 +1,7 @@
 import { create } from "zustand";
+import { type DisplayState, initialDisplayState } from "../domain/displayMode";
 
-export type AppMode = "scan" | "manage";
+export type AppMode = "scan" | "manage" | "display";
 
 export type ScanStatus =
   | "idle"
@@ -44,8 +45,10 @@ export type ScanState = {
 export type AppState = {
   mode: AppMode;
   scan: ScanState;
+  display: DisplayState;
   setMode: (mode: AppMode) => void;
   setScanState: (scan: ScanState) => void;
+  setDisplayState: (display: DisplayState) => void;
   resetScanState: () => void;
 };
 
@@ -73,7 +76,9 @@ export const initialScanState: ScanState = {
 export const useAppStore = create<AppState>((set) => ({
   mode: "scan",
   scan: initialScanState,
+  display: initialDisplayState,
   setMode: (mode) => set({ mode }),
   setScanState: (scan) => set({ scan }),
+  setDisplayState: (display) => set({ display }),
   resetScanState: () => set({ scan: initialScanState }),
 }));

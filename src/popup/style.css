@@ -31,7 +31,7 @@ button:disabled {
 }
 
 .popup {
-  width: 320px;
+  width: 606px;
   padding: 16px;
 }
 
@@ -49,9 +49,16 @@ button:disabled {
 .modeButtons,
 .actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 8px;
   margin-top: 16px;
+}
+
+.modeButtons {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.actions {
+  grid-template-columns: 1fr 1fr;
 }
 
 .modeButtons .active {
@@ -109,4 +116,75 @@ button:disabled {
 
 .status.captured {
   color: #1f7a4d;
+}
+
+.displaySection {
+  margin-top: 16px;
+}
+
+.emptyDisplay {
+  margin-top: 16px;
+}
+
+.displayGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 110px);
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.displayCard {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  width: 110px;
+  height: 110px;
+  border: 1px solid #d8dee8;
+  border-radius: 6px;
+  padding: 8px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.displayCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.ownedId,
+.rating {
+  color: #697586;
+  font-size: 11px;
+}
+
+.displayCard strong {
+  display: -webkit-box;
+  margin-top: 6px;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.25;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.rating {
+  margin-top: 6px;
+}
+
+.rating.unrated {
+  color: #9a6b20;
+}
+
+.warningMarker {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  color: #8a3b12;
+  font-size: 11px;
+  font-weight: 700;
+  background: #fff1d6;
 }

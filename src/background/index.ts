@@ -2,8 +2,14 @@ import { ZodError } from "zod";
 import { artifactListResponseSchema } from "../api/artifactListSchema";
 import type { ArtifactListResponse } from "../api/artifactListTypes";
 import type { Artifact } from "../domain/artifact";
+import type { ArtifactUserReview } from "../domain/artifactUserReview";
+import {
+  type DisplayArtifactItem,
+  type DisplayState,
+  initialDisplayState,
+} from "../domain/displayMode";
 import { normalizeArtifact } from "../domain/normalizeArtifact";
-import type { ScanSession } from "../domain/scanSession";
+import type { ArtifactPresence, ScanSession } from "../domain/scanSession";
 import type {
   ErrorResponse,
   ExtensionMessage,
@@ -39,6 +45,7 @@ import {
 
 let currentMode: AppMode = "scan";
 let currentScanState = initialScanState;
+let currentDisplayState: DisplayState = initialDisplayState;
 
 chrome.runtime.onMessage.addListener(
   (
@@ -60,6 +67,7 @@ chrome.runtime.onMessage.addListener(
           message: "Unexpected extension error.",
           errorCode: "unexpected_response",
           scan: currentScanState,
+          display: currentDisplayState,
         });
       });
 
@@ -78,6 +86,7 @@ async function handleMessage(
         type: "APP_STATE",
         mode: currentMode,
         scan: currentScanState,
+        display: currentDisplayState,
       };
     case "SET_APP_MODE":
       currentMode = message.mode;
@@ -86,11 +95,22 @@ async function handleMessage(
         type: "APP_STATE",
         mode: currentMode,
         scan: currentScanState,
+        display: currentDisplayState,
       };
     case "START_OBSERVING":
       return startObserving();
     case "STOP_OBSERVING":
       return stopObserving();
+    case "START_DISPLAY_MODE":
+      return startDisplayMode();
+    case "STOP_DISPLAY_MODE":
+      return stopDisplayMode();
+    case "GET_DISPLAY_STATE":
+      return {
+        ok: true,
+        type: "DISPLAY_STATE",
+        display: currentDisplayState,
+      };
     case "ARTIFACT_LIST_OBSERVED":
       return handleObservedArtifactList(message);
     case "GET_STORED_ARTIFACT_COUNT":
@@ -281,6 +301,91 @@ async function stopObserving(): Promise<ExtensionResponse> {
   };
 }
 
+async function startDisplayMode(): Promise<ExtensionResponse> {
+  const tab = await getActiveTab();
+
+  if (tab?.id === undefined) {
+    return displayErrorResponse(
+      "active_tab_unavailable",
+      "Active tab could not be identified.",
+    );
+  }
+
+  if (!isGranblueFantasyTab(tab)) {
+    return displayErrorResponse(
+      "not_on_artifact_page",
+      "Open a GBF page before starting display mode.",
+    );
+  }
+
+  if ((await getActiveScanSession()) !== null) {
+    return displayErrorResponse(
+      "unexpected_response",
+      "Stop scan observation before starting display mode.",
+    );
+  }
+
+  try {
+    await injectPageObserver(tab.id);
+    await chrome.tabs.sendMessage<ExtensionMessage, ExtensionResponse>(tab.id, {
+      type: "START_DISPLAY_MODE",
+    });
+  } catch (error) {
+    logDebugError("Could not start display mode", error, { tabId: tab.id });
+    return displayErrorResponse(
+      "unexpected_response",
+      "Could not start display mode.",
+    );
+  }
+
+  currentMode = "display";
+  currentDisplayState = {
+    isEnabled: true,
+    itemCount: 0,
+    items: [],
+  };
+  console.info("[GBF Artifact Manager] display mode start", { tabId: tab.id });
+
+  return {
+    ok: true,
+    type: "DISPLAY_STATUS",
+    message: "Display mode started.",
+    display: currentDisplayState,
+  };
+}
+
+async function stopDisplayMode(): Promise<ExtensionResponse> {
+  const tab = await getActiveTab();
+
+  if (tab?.id === undefined) {
+    return displayErrorResponse(
+      "active_tab_unavailable",
+      "Active tab could not be identified.",
+    );
+  }
+
+  try {
+    await chrome.tabs.sendMessage<ExtensionMessage, ExtensionResponse>(tab.id, {
+      type: "STOP_DISPLAY_MODE",
+    });
+  } catch (error) {
+    logDebugError("Could not stop display mode", error, { tabId: tab.id });
+  }
+
+  currentDisplayState = {
+    ...currentDisplayState,
+    isEnabled: false,
+  };
+  console.info("[GBF Artifact Manager] display mode stop", { tabId: tab.id });
+
+  return {
+    ok: true,
+    type: "DISPLAY_STATUS",
+    message: "Display mode stopped.",
+    display: currentDisplayState,
+  };
+}
+
 async function handleObservedArtifactList(
   message: Extract<ExtensionMessage, { type: "ARTIFACT_LIST_OBSERVED" }>,
 ): Promise<ExtensionResponse> {
@@ -292,10 +397,25 @@ async function handleObservedArtifactList(
   const artifactListResult = validateObservedArtifactList(message.payload);
 
   if (!artifactListResult.ok) {
-    return artifactListResult;
+    if (currentMode === "display" && currentDisplayState.isEnabled) {
+      return displayErrorResponse(
+        artifactListResult.errorCode ?? "api_validation_failed",
+        artifactListResult.message,
+      );
+    }
+
+    return scanErrorResponse(
+      artifactListResult.errorCode ?? "api_validation_failed",
+      artifactListResult.message,
+    );
   }
 
   const artifactList = artifactListResult.artifactList;
+
+  if (currentMode === "display" && currentDisplayState.isEnabled) {
+    return updateDisplayFromObservedArtifactList(artifactList);
+  }
+
   const activeSession = await ensureActiveScanSession(scannedAt);
   const artifacts = artifactList.list.map((raw) =>
     normalizeArtifact(raw, scannedAt),
@@ -359,6 +479,67 @@ async function handleObservedArtifactList(
     page: artifactList.current,
     scan: currentScanState,
   };
+}
+
+async function updateDisplayFromObservedArtifactList(
+  artifactList: ArtifactListResponse,
+): Promise<ExtensionResponse> {
+  const capturedAt = new Date().toISOString();
+  const artifacts = artifactList.list.map((raw) =>
+    normalizeArtifact(raw, capturedAt),
+  );
+
+  try {
+    const [reviews, presenceMap] = await Promise.all([
+      getArtifactUserReviews(),
+      getArtifactPresenceMap(),
+    ]);
+    const reviewsByOwnedId = indexReviewsByOwnedId(reviews);
+    const items = artifacts.map((artifact) =>
+      createDisplayArtifactItem(
+        artifact,
+        reviewsByOwnedId[artifact.ownedId] ?? null,
+        presenceMap[artifact.ownedId] ?? null,
+      ),
+    );
+
+    currentDisplayState = {
+      isEnabled: true,
+      currentPage: artifactList.current,
+      capturedAt,
+      itemCount: items.length,
+      items,
+    };
+
+    chrome.runtime
+      .sendMessage({
+        type: "DISPLAY_CAPTURED_UPDATE",
+        display: currentDisplayState,
+      } satisfies ExtensionMessage)
+      .catch(() => {
+        // Popup may be closed; no action needed.
+      });
+
+    console.info("[GBF Artifact Manager] display capture update", {
+      page: artifactList.current,
+      artifactCount: items.length,
+    });
+
+    return {
+      ok: true,
+      type: "DISPLAY_STATUS",
+      message: `Display updated from page ${artifactList.current}.`,
+      display: currentDisplayState,
+    };
+  } catch (error) {
+    logDebugError("Could not update display mode", error, {
+      page: artifactList.current,
+    });
+    return displayErrorResponse(
+      "storage_failed",
+      "Could not read stored review data for display mode.",
+    );
+  }
 }
 
 async function injectPageObserver(tabId: number): Promise<void> {
@@ -565,17 +746,11 @@ function validateObservedArtifactList(payload: unknown):
   } catch (error) {
     if (error instanceof ZodError) {
       logZodError("validation failure", error);
-      return scanErrorResponse(
-        "api_validation_failed",
-        "Artifact list response did not match the expected shape.",
-      );
+      return validationErrorResponse();
     }
 
     logDebugError("Artifact list validation failed", error);
-    return scanErrorResponse(
-      "api_validation_failed",
-      "Artifact list response did not match the expected shape.",
-    );
+    return validationErrorResponse();
   }
 }
 
@@ -722,6 +897,32 @@ function createScanSessionId(dateText: string): string {
   return `scan-${dateText}-${Math.random().toString(16).slice(2)}`;
 }
 
+function indexReviewsByOwnedId(
+  reviews: ArtifactUserReview[],
+): Record<number, ArtifactUserReview> {
+  const reviewsByOwnedId: Record<number, ArtifactUserReview> = {};
+
+  for (const review of reviews) {
+    reviewsByOwnedId[review.ownedId] = review;
+  }
+
+  return reviewsByOwnedId;
+}
+
+function createDisplayArtifactItem(
+  artifact: Artifact,
+  review: ArtifactUserReview | null,
+  presence: ArtifactPresence | null,
+): DisplayArtifactItem {
+  return {
+    ownedId: artifact.ownedId,
+    name: artifact.name,
+    rating: review?.rating ?? 0,
+    memo: review?.memo ?? "",
+    isPossiblyDeleted: presence?.isPossiblyDeleted ?? false,
+  };
+}
+
 async function getActiveTab(): Promise<chrome.tabs.Tab | null> {
   const [tab] = await chrome.tabs.query({
     active: true,
@@ -753,6 +954,28 @@ function scanErrorResponse(
     message,
     errorCode,
     scan: currentScanState,
+  };
+}
+
+function displayErrorResponse(
+  errorCode: ScanErrorCode,
+  message: string,
+): ErrorResponse {
+  return {
+    ok: false,
+    type: "ERROR",
+    message,
+    errorCode,
+    display: currentDisplayState,
+  };
+}
+
+function validationErrorResponse(): ErrorResponse {
+  return {
+    ok: false,
+    type: "ERROR",
+    message: "Artifact list response did not match the expected shape.",
+    errorCode: "api_validation_failed",
   };
 }
 

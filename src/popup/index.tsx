@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
+import type { DisplayArtifactItem, DisplayState } from "../domain/displayMode";
 import { sendRuntimeMessage } from "../shared/chromeMessages";
 import type { ErrorResponse, ExtensionResponse } from "../shared/messages";
 import {
@@ -11,7 +12,8 @@ import {
 import "./style.css";
 
 function Popup() {
-  const { mode, scan, setMode, setScanState } = useAppStore();
+  const { mode, scan, display, setMode, setScanState, setDisplayState } =
+    useAppStore();
   const [statusMessage, setStatusMessage] = useState("Ready.");
   const hasActiveSession = scan.activeScanSessionId !== null;
 
@@ -20,6 +22,7 @@ function Popup() {
       if (response.ok && response.type === "APP_STATE") {
         setMode(response.mode);
         setScanState(response.scan);
+        setDisplayState(response.display);
       }
     });
 
@@ -34,6 +37,17 @@ function Popup() {
         setScanState(message.scan as ScanState);
         setStatusMessage("Captured artifact list response.");
       }
+
+      if (
+        typeof message === "object" &&
+        message !== null &&
+        "type" in message &&
+        message.type === "DISPLAY_CAPTURED_UPDATE" &&
+        "display" in message
+      ) {
+        setDisplayState(message.display as DisplayState);
+        setStatusMessage("Display page updated.");
+      }
     };
 
     chrome.runtime.onMessage.addListener(handleRuntimeMessage);
@@ -41,7 +55,7 @@ function Popup() {
     return () => {
       chrome.runtime.onMessage.removeListener(handleRuntimeMessage);
     };
-  }, [setMode, setScanState]);
+  }, [setDisplayState, setMode, setScanState]);
 
   const changeMode = async (nextMode: AppMode) => {
     const response = await sendRuntimeMessage({
@@ -69,6 +83,18 @@ function Popup() {
     handleResponse(response);
   };
 
+  const startDisplayMode = async () => {
+    setStatusMessage("Starting display mode...");
+
+    const response = await sendRuntimeMessage({ type: "START_DISPLAY_MODE" });
+    handleResponse(response);
+  };
+
+  const stopDisplayMode = async () => {
+    const response = await sendRuntimeMessage({ type: "STOP_DISPLAY_MODE" });
+    handleResponse(response);
+  };
+
   const openDashboard = async () => {
     const response = await sendRuntimeMessage({ type: "OPEN_DASHBOARD" });
     handleResponse(response);
@@ -86,6 +112,9 @@ function Popup() {
       if (response.scan !== undefined) {
         setScanState(response.scan);
       }
+      if (response.display !== undefined) {
+        setDisplayState(response.display);
+      }
       setStatusMessage(getPopupErrorMessage(response));
       return;
     }
@@ -93,6 +122,7 @@ function Popup() {
     if (response.type === "APP_STATE") {
       setMode(response.mode);
       setScanState(response.scan);
+      setDisplayState(response.display);
       setStatusMessage(`Mode changed to ${response.mode}.`);
       return;
     }
@@ -106,6 +136,18 @@ function Popup() {
     if (response.type === "ARTIFACT_LIST_OBSERVED_RESULT") {
       setScanState(response.scan);
       setStatusMessage(response.message);
+      return;
+    }
+
+    if (response.type === "DISPLAY_STATUS") {
+      setDisplayState(response.display);
+      setStatusMessage(response.message);
+      return;
+    }
+
+    if (response.type === "DISPLAY_STATE") {
+      setDisplayState(response.display);
+      setStatusMessage("Display state loaded.");
       return;
     }
 
@@ -149,73 +191,193 @@ function Popup() {
           >
             Manage
           </button>
+          <button
+            className={mode === "display" ? "active" : ""}
+            type="button"
+            onClick={() => changeMode("display")}
+          >
+            Display
+          </button>
         </div>
       </section>
 
-      <section aria-label="Scan summary" className="summary">
-        <div>
-          <span>Status</span>
-          <strong>{formatScanStatus(scan.status)}</strong>
-        </div>
-        <div>
-          <span>Latest page</span>
-          <strong>{scan.lastScannedPage ?? "-"}</strong>
-        </div>
-        <div>
-          <span>Observed pages</span>
-          <strong>
-            {scan.observedPages.length > 0
-              ? scan.observedPages.join(", ")
-              : "-"}
-          </strong>
-        </div>
-        <div>
-          <span>Expected last</span>
-          <strong>{scan.expectedLastPage ?? "-"}</strong>
-        </div>
-        <div>
-          <span>Full scan</span>
-          <strong>{scan.isFullScan ? "Yes" : "No"}</strong>
-        </div>
-        <div>
-          <span>Observed artifacts</span>
-          <strong>{scan.observedArtifactCount}</strong>
-        </div>
-        <div>
-          <span>Persisted</span>
-          <strong>{scan.persistedArtifactCount}</strong>
-        </div>
-      </section>
+      {mode === "scan" && (
+        <>
+          <ScanSummary scan={scan} />
 
-      <section className="actions" aria-label="Actions">
-        <button
-          type="button"
-          onClick={startObserving}
-          disabled={hasActiveSession}
-        >
-          Start Observing
-        </button>
-        <button
-          type="button"
-          onClick={stopObserving}
-          disabled={!hasActiveSession}
-        >
-          Stop Observing
-        </button>
-        <button type="button" onClick={openDashboard}>
-          Open Dashboard
-        </button>
-        <button
-          type="button"
-          onClick={clearStoredData}
-          disabled={hasActiveSession}
-        >
-          Clear Stored Data
-        </button>
-      </section>
+          <section className="actions" aria-label="Scan actions">
+            <button
+              type="button"
+              onClick={startObserving}
+              disabled={hasActiveSession || display.isEnabled}
+            >
+              Start Observing
+            </button>
+            <button
+              type="button"
+              onClick={stopObserving}
+              disabled={!hasActiveSession}
+            >
+              Stop Observing
+            </button>
+            <button type="button" onClick={openDashboard}>
+              Open Dashboard
+            </button>
+            <button
+              type="button"
+              onClick={clearStoredData}
+              disabled={hasActiveSession || display.isEnabled}
+            >
+              Clear Stored Data
+            </button>
+          </section>
+        </>
+      )}
+
+      {mode === "manage" && (
+        <section className="actions" aria-label="Manage actions">
+          <button type="button" onClick={openDashboard}>
+            Open Dashboard
+          </button>
+          <button
+            type="button"
+            onClick={clearStoredData}
+            disabled={hasActiveSession || display.isEnabled}
+          >
+            Clear Stored Data
+          </button>
+        </section>
+      )}
+
+      {mode === "display" && (
+        <DisplayModeSection
+          display={display}
+          hasActiveSession={hasActiveSession}
+          onStart={startDisplayMode}
+          onStop={stopDisplayMode}
+        />
+      )}
 
       <p className={`status ${scan.status}`}>{statusMessage}</p>
     </main>
+  );
+}
+
+function ScanSummary({ scan }: { scan: ScanState }) {
+  return (
+    <section aria-label="Scan summary" className="summary">
+      <div>
+        <span>Status</span>
+        <strong>{formatScanStatus(scan.status)}</strong>
+      </div>
+      <div>
+        <span>Latest page</span>
+        <strong>{scan.lastScannedPage ?? "-"}</strong>
+      </div>
+      <div>
+        <span>Observed pages</span>
+        <strong>
+          {scan.observedPages.length > 0 ? scan.observedPages.join(", ") : "-"}
+        </strong>
+      </div>
+      <div>
+        <span>Expected last</span>
+        <strong>{scan.expectedLastPage ?? "-"}</strong>
+      </div>
+      <div>
+        <span>Full scan</span>
+        <strong>{scan.isFullScan ? "Yes" : "No"}</strong>
+      </div>
+      <div>
+        <span>Observed artifacts</span>
+        <strong>{scan.observedArtifactCount}</strong>
+      </div>
+      <div>
+        <span>Persisted</span>
+        <strong>{scan.persistedArtifactCount}</strong>
+      </div>
+    </section>
+  );
+}
+
+function DisplayModeSection({
+  display,
+  hasActiveSession,
+  onStart,
+  onStop,
+}: {
+  display: DisplayState;
+  hasActiveSession: boolean;
+  onStart: () => void;
+  onStop: () => void;
+}) {
+  return (
+    <section aria-label="Display mode" className="displaySection">
+      <div className="actions">
+        <button
+          type="button"
+          onClick={onStart}
+          disabled={display.isEnabled || hasActiveSession}
+        >
+          Start Display Mode
+        </button>
+        <button type="button" onClick={onStop} disabled={!display.isEnabled}>
+          Stop Display Mode
+        </button>
+      </div>
+
+      <section aria-label="Display summary" className="summary">
+        <div>
+          <span>Status</span>
+          <strong>{display.isEnabled ? "Enabled" : "Stopped"}</strong>
+        </div>
+        <div>
+          <span>Page</span>
+          <strong>{display.currentPage ?? "-"}</strong>
+        </div>
+        <div>
+          <span>Captured</span>
+          <strong>{display.capturedAt ?? "-"}</strong>
+        </div>
+        <div>
+          <span>Items</span>
+          <strong>{display.itemCount}</strong>
+        </div>
+      </section>
+
+      {display.items.length === 0 ? (
+        <p className="emptyDisplay">Open an artifact list page in GBF.</p>
+      ) : (
+        <div className="displayGrid">
+          {display.items.map((item) => (
+            <DisplayArtifactCard key={item.ownedId} item={item} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function DisplayArtifactCard({ item }: { item: DisplayArtifactItem }) {
+  return (
+    <div className="displayCard" title={item.memo}>
+      <div className="displayCardHeader">
+        <span className="ownedId">#{item.ownedId}</span>
+        {item.isPossiblyDeleted && (
+          <span
+            className="warningMarker"
+            role="img"
+            aria-label="Possibly deleted"
+          >
+            !
+          </span>
+        )}
+      </div>
+      <strong>{item.name}</strong>
+      <span className={item.rating === 0 ? "rating unrated" : "rating"}>
+        {formatRating(item.rating)}
+      </span>
+    </div>
   );
 }
 
@@ -257,6 +419,14 @@ function formatScanStatus(status: ScanStatus) {
     case "error":
       return "Error";
   }
+}
+
+function formatRating(rating: DisplayArtifactItem["rating"]): string {
+  if (rating === 0) {
+    return "Unrated";
+  }
+
+  return `${"★".repeat(rating)}${"☆".repeat(5 - rating)}`;
 }
 
 const rootElement = document.getElementById("root");

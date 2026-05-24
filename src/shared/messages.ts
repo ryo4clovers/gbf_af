@@ -1,5 +1,6 @@
 import type { Artifact } from "../domain/artifact";
 import type { ArtifactUserReview } from "../domain/artifactUserReview";
+import type { DisplayState } from "../domain/displayMode";
 import type { ArtifactPresence, ScanSession } from "../domain/scanSession";
 import type { AppMode, ScanErrorCode, ScanState } from "../state/appState";
 
@@ -8,8 +9,12 @@ export type ExtensionMessage =
   | SetAppModeMessage
   | StartObservingMessage
   | StopObservingMessage
+  | StartDisplayModeMessage
+  | StopDisplayModeMessage
+  | GetDisplayStateMessage
   | ArtifactListObservedMessage
   | ObservationCapturedUpdateMessage
+  | DisplayCapturedUpdateMessage
   | GetStoredArtifactCountMessage
   | GetStoredArtifactsMessage
   | ClearStoredArtifactsMessage
@@ -25,6 +30,8 @@ export type ExtensionResponse =
   | AppStateResponse
   | PageInfoResponse
   | ObservationStatusResponse
+  | DisplayStatusResponse
+  | DisplayStateResponse
   | ArtifactListObservedResponse
   | StoredArtifactCountResponse
   | StoredArtifactsResponse
@@ -54,6 +61,18 @@ export type StopObservingMessage = {
   type: "STOP_OBSERVING";
 };
 
+export type StartDisplayModeMessage = {
+  type: "START_DISPLAY_MODE";
+};
+
+export type StopDisplayModeMessage = {
+  type: "STOP_DISPLAY_MODE";
+};
+
+export type GetDisplayStateMessage = {
+  type: "GET_DISPLAY_STATE";
+};
+
 export type ArtifactListObservedMessage = {
   type: "ARTIFACT_LIST_OBSERVED";
   url: string;
@@ -64,6 +83,11 @@ export type ArtifactListObservedMessage = {
 export type ObservationCapturedUpdateMessage = {
   type: "OBSERVATION_CAPTURED_UPDATE";
   scan: ScanState;
+};
+
+export type DisplayCapturedUpdateMessage = {
+  type: "DISPLAY_CAPTURED_UPDATE";
+  display: DisplayState;
 };
 
 export type GetStoredArtifactCountMessage = {
@@ -112,6 +136,7 @@ export type AppStateResponse = {
   type: "APP_STATE";
   mode: AppMode;
   scan: ScanState;
+  display: DisplayState;
 };
 
 export type PageInfoResponse = {
@@ -129,6 +154,19 @@ export type ObservationStatusResponse = {
   message: string;
   observing: boolean;
   scan: ScanState;
+};
+
+export type DisplayStatusResponse = {
+  ok: true;
+  type: "DISPLAY_STATUS";
+  message: string;
+  display: DisplayState;
+};
+
+export type DisplayStateResponse = {
+  ok: true;
+  type: "DISPLAY_STATE";
+  display: DisplayState;
 };
 
 export type ArtifactListObservedResponse = {
@@ -204,4 +242,5 @@ export type ErrorResponse = {
   message: string;
   errorCode?: ScanErrorCode;
   scan?: ScanState;
+  display?: DisplayState;
 };
