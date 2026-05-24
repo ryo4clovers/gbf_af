@@ -1,4 +1,5 @@
 import type { Artifact } from "../domain/artifact";
+import type { ArtifactUserReview } from "../domain/artifactUserReview";
 import type { AppMode, ScanErrorCode, ScanState } from "../state/appState";
 
 export type ExtensionMessage =
@@ -11,6 +12,9 @@ export type ExtensionMessage =
   | GetStoredArtifactCountMessage
   | GetStoredArtifactsMessage
   | ClearStoredArtifactsMessage
+  | GetArtifactUserReviewsMessage
+  | SaveArtifactUserReviewMessage
+  | ClearArtifactUserReviewsMessage
   | OpenDashboardMessage
   | GetPageInfoMessage;
 
@@ -22,6 +26,9 @@ export type ExtensionResponse =
   | StoredArtifactCountResponse
   | StoredArtifactsResponse
   | ClearStoredArtifactsResponse
+  | ArtifactUserReviewsResponse
+  | SaveArtifactUserReviewResponse
+  | ClearArtifactUserReviewsResponse
   | OpenDashboardResponse
   | ErrorResponse;
 
@@ -64,6 +71,19 @@ export type GetStoredArtifactsMessage = {
 
 export type ClearStoredArtifactsMessage = {
   type: "CLEAR_STORED_ARTIFACTS";
+};
+
+export type GetArtifactUserReviewsMessage = {
+  type: "GET_ARTIFACT_USER_REVIEWS";
+};
+
+export type SaveArtifactUserReviewMessage = {
+  type: "SAVE_ARTIFACT_USER_REVIEW";
+  review: ArtifactUserReview;
+};
+
+export type ClearArtifactUserReviewsMessage = {
+  type: "CLEAR_ARTIFACT_USER_REVIEWS";
 };
 
 export type OpenDashboardMessage = {
@@ -127,6 +147,23 @@ export type ClearStoredArtifactsResponse = {
   type: "CLEAR_STORED_ARTIFACTS_RESULT";
   artifactCount: number;
   scan: ScanState;
+};
+
+export type ArtifactUserReviewsResponse = {
+  ok: true;
+  type: "ARTIFACT_USER_REVIEWS";
+  reviews: ArtifactUserReview[];
+};
+
+export type SaveArtifactUserReviewResponse = {
+  ok: true;
+  type: "SAVE_ARTIFACT_USER_REVIEW_RESULT";
+  review: ArtifactUserReview;
+};
+
+export type ClearArtifactUserReviewsResponse = {
+  ok: true;
+  type: "CLEAR_ARTIFACT_USER_REVIEWS_RESULT";
 };
 
 export type OpenDashboardResponse = {

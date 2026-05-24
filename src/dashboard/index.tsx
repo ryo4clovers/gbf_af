@@ -1,15 +1,19 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { convertArtifactsToCsv } from "../csv/artifactCsv";
+import { convertArtifactRowsToCsv } from "../csv/artifactCsv";
 import type { Artifact } from "../domain/artifact";
+import type {
+  ArtifactUserRating,
+  ArtifactUserReview,
+} from "../domain/artifactUserReview";
 import { sendRuntimeMessage } from "../shared/chromeMessages";
-import type { ExtensionResponse } from "../shared/messages";
 import { useAppStore } from "../state/appState";
 import "./style.css";
 
 type LockedFilter = "all" | "locked" | "unlocked";
 type EquippedFilter = "all" | "equipped" | "unequipped";
-type SortKey = "totalScore" | "ownedId" | "name";
+type RatingFilter = "all" | "unrated" | "1" | "2" | "3" | "4" | "5";
+type SortKey = "totalScore" | "ownedId" | "name" | "rating";
 type SortDirection = "asc" | "desc";
 
 type ArtifactFilters = {
@@ -18,6 +22,7 @@ type ArtifactFilters = {
   kind: string;
   locked: LockedFilter;
   equipped: EquippedFilter;
+  rating: RatingFilter;
 };
 
 type ArtifactSort = {
@@ -31,11 +36,20 @@ const initialFilters: ArtifactFilters = {
   kind: "all",
   locked: "all",
   equipped: "all",
+  rating: "all",
+};
+
+type ReviewedArtifactRow = {
+  artifact: Artifact;
+  review: ArtifactUserReview | null;
 };
 
 function Dashboard() {
   const { mode, scan, setMode, setScanState } = useAppStore();
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  const [reviewsByOwnedId, setReviewsByOwnedId] = useState<
+    Record<number, ArtifactUserReview>
+  >({});
   const [filters, setFilters] = useState<ArtifactFilters>(initialFilters);
   const [sort, setSort] = useState<ArtifactSort>({
     key: "totalScore",
@@ -43,58 +57,130 @@ function Dashboard() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Loading artifacts...");
-  const filteredArtifacts = getFilteredAndSortedArtifacts(
-    artifacts,
+  const artifactRows = artifacts.map((artifact) => ({
+    artifact,
+    review: reviewsByOwnedId[artifact.ownedId] ?? null,
+  }));
+  const filteredRows = getFilteredAndSortedArtifactRows(
+    artifactRows,
     filters,
     sort,
   );
   const attributeOptions = getAttributeOptions(artifacts);
   const kindOptions = getKindOptions(artifacts);
 
-  const handleStoredArtifactsResponse = useCallback(
-    (response: ExtensionResponse) => {
-      if (!response.ok) {
-        if (response.scan !== undefined) {
-          setScanState(response.scan);
-        }
-
-        setStatusMessage(response.message);
-        return;
-      }
-
-      if (response.type === "STORED_ARTIFACTS") {
-        setArtifacts(response.artifacts);
-        setScanState(response.scan);
-        setStatusMessage(`Loaded ${response.artifactCount} stored artifacts.`);
-      }
-    },
-    [setScanState],
-  );
-
   const loadArtifacts = useCallback(async () => {
     setIsLoading(true);
     setStatusMessage("Loading artifacts...");
 
-    const response = await sendRuntimeMessage({ type: "GET_STORED_ARTIFACTS" });
-    handleStoredArtifactsResponse(response);
+    const [artifactResponse, reviewResponse] = await Promise.all([
+      sendRuntimeMessage({ type: "GET_STORED_ARTIFACTS" }),
+      sendRuntimeMessage({ type: "GET_ARTIFACT_USER_REVIEWS" }),
+    ]);
+
+    if (!artifactResponse.ok) {
+      if (artifactResponse.scan !== undefined) {
+        setScanState(artifactResponse.scan);
+      }
+
+      setStatusMessage(artifactResponse.message);
+      setIsLoading(false);
+      return;
+    }
+
+    if (artifactResponse.type === "STORED_ARTIFACTS") {
+      setArtifacts(artifactResponse.artifacts);
+      setScanState(artifactResponse.scan);
+    }
+
+    if (!reviewResponse.ok) {
+      setStatusMessage(reviewResponse.message);
+      setIsLoading(false);
+      return;
+    }
+
+    if (reviewResponse.type === "ARTIFACT_USER_REVIEWS") {
+      setReviewsByOwnedId(indexReviewsByOwnedId(reviewResponse.reviews));
+    }
+
+    setStatusMessage(
+      `Loaded ${artifactResponse.type === "STORED_ARTIFACTS" ? artifactResponse.artifactCount : 0} stored artifacts.`,
+    );
     setIsLoading(false);
-  }, [handleStoredArtifactsResponse]);
+  }, [setScanState]);
 
   useEffect(() => {
     loadArtifacts();
   }, [loadArtifacts]);
 
   const exportCsv = () => {
-    if (filteredArtifacts.length === 0) {
+    if (filteredRows.length === 0) {
       setStatusMessage("No artifacts match the current filters.");
       return;
     }
 
     downloadCsvFile(
-      convertArtifactsToCsv(filteredArtifacts),
+      convertArtifactRowsToCsv(
+        filteredRows.map((row) => ({
+          artifact: row.artifact,
+          review: row.review ?? undefined,
+        })),
+      ),
       createArtifactCsvFileName(new Date()),
     );
-    setStatusMessage(`Exported ${filteredArtifacts.length} artifacts.`);
+    setStatusMessage(`Exported ${filteredRows.length} artifacts.`);
+  };
+
+  const saveReview = async (
+    ownedId: number,
+    rating: ArtifactUserRating,
+    memo: string,
+  ) => {
+    const review: ArtifactUserReview = {
+      ownedId,
+      rating,
+      memo,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setReviewsByOwnedId((current) => ({
+      ...current,
+      [ownedId]: review,
+    }));
+
+    const response = await sendRuntimeMessage({
+      type: "SAVE_ARTIFACT_USER_REVIEW",
+      review,
+    });
+
+    if (!response.ok) {
+      setStatusMessage(response.message);
+      return;
+    }
+
+    if (response.type === "SAVE_ARTIFACT_USER_REVIEW_RESULT") {
+      setReviewsByOwnedId((current) => ({
+        ...current,
+        [response.review.ownedId]: response.review,
+      }));
+      setStatusMessage(`Saved review for ${response.review.ownedId}.`);
+    }
+  };
+
+  const updateMemoDraft = (ownedId: number, memo: string) => {
+    setReviewsByOwnedId((current) => {
+      const currentReview = current[ownedId];
+
+      return {
+        ...current,
+        [ownedId]: {
+          ownedId,
+          rating: currentReview?.rating ?? 0,
+          memo,
+          updatedAt: currentReview?.updatedAt ?? "",
+        },
+      };
+    });
   };
 
   return (
@@ -157,7 +243,7 @@ function Dashboard() {
           <ArtifactControls
             artifactCount={artifacts.length}
             attributeOptions={attributeOptions}
-            filteredCount={filteredArtifacts.length}
+            filteredCount={filteredRows.length}
             filters={filters}
             kindOptions={kindOptions}
             onFiltersChange={setFilters}
@@ -168,7 +254,20 @@ function Dashboard() {
           {artifacts.length === 0 ? (
             <p className="emptyState">No stored artifacts found.</p>
           ) : (
-            <ArtifactTable artifacts={filteredArtifacts} />
+            <ArtifactTable
+              rows={filteredRows}
+              onMemoBlur={(row) =>
+                saveReview(
+                  row.artifact.ownedId,
+                  row.review?.rating ?? 0,
+                  row.review?.memo ?? "",
+                )
+              }
+              onMemoChange={updateMemoDraft}
+              onRatingChange={(row, rating) =>
+                saveReview(row.artifact.ownedId, rating, row.review?.memo ?? "")
+              }
+            />
           )}
         </div>
         <div className="panel">
@@ -185,7 +284,7 @@ function Dashboard() {
             className="panelAction"
             type="button"
             onClick={exportCsv}
-            disabled={filteredArtifacts.length === 0}
+            disabled={filteredRows.length === 0}
           >
             Export CSV
           </button>
@@ -307,6 +406,27 @@ function ArtifactControls({
         </label>
 
         <label>
+          Rating
+          <select
+            value={filters.rating}
+            onChange={(event) =>
+              onFiltersChange({
+                ...filters,
+                rating: event.currentTarget.value as RatingFilter,
+              })
+            }
+          >
+            <option value="all">All</option>
+            <option value="unrated">Unrated</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+          </select>
+        </label>
+
+        <label>
           Sort
           <select
             value={`${sort.key}:${sort.direction}`}
@@ -324,6 +444,8 @@ function ArtifactControls({
             <option value="ownedId:asc">ownedId ascending</option>
             <option value="name:asc">Name ascending</option>
             <option value="name:desc">Name descending</option>
+            <option value="rating:asc">Rating ascending</option>
+            <option value="rating:desc">Rating descending</option>
           </select>
         </label>
       </div>
@@ -335,7 +457,20 @@ function ArtifactControls({
   );
 }
 
-function ArtifactTable({ artifacts }: { artifacts: Artifact[] }) {
+function ArtifactTable({
+  rows,
+  onMemoBlur,
+  onMemoChange,
+  onRatingChange,
+}: {
+  rows: ReviewedArtifactRow[];
+  onMemoBlur: (row: ReviewedArtifactRow) => void;
+  onMemoChange: (ownedId: number, memo: string) => void;
+  onRatingChange: (
+    row: ReviewedArtifactRow,
+    rating: ArtifactUserRating,
+  ) => void;
+}) {
   return (
     <div className="tableScroller">
       <table>
@@ -347,52 +482,95 @@ function ArtifactTable({ artifacts }: { artifacts: Artifact[] }) {
             <th>Kind</th>
             <th>Level</th>
             <th>Total score</th>
+            <th>Rating</th>
+            <th>Memo</th>
             <th>Locked</th>
             <th>Equipped</th>
             <th>Skills</th>
           </tr>
         </thead>
         <tbody>
-          {artifacts.map((artifact) => (
-            <tr key={artifact.ownedId}>
-              <td>{artifact.ownedId}</td>
-              <td>{artifact.name}</td>
-              <td>{artifact.attribute.label}</td>
-              <td>{artifact.kind.label}</td>
-              <td>
-                {artifact.level}/{artifact.maxLevel}
-              </td>
-              <td>{artifact.gameScore.total}</td>
-              <td>{artifact.isLocked ? "Yes" : "No"}</td>
-              <td>{artifact.equippedCharacter?.name ?? "-"}</td>
-              <td>
-                <ul className="skillList">
-                  {artifact.skills.map((skill) => (
-                    <li key={skill.slot}>
-                      {skill.name}: {skill.effectValueText}
-                    </li>
-                  ))}
-                </ul>
-              </td>
-            </tr>
-          ))}
+          {rows.map((row) => {
+            const { artifact, review } = row;
+
+            return (
+              <tr key={artifact.ownedId}>
+                <td>{artifact.ownedId}</td>
+                <td>{artifact.name}</td>
+                <td>{artifact.attribute.label}</td>
+                <td>{artifact.kind.label}</td>
+                <td>
+                  {artifact.level}/{artifact.maxLevel}
+                </td>
+                <td>{artifact.gameScore.total}</td>
+                <td>
+                  <select
+                    className="ratingSelect"
+                    value={review?.rating ?? 0}
+                    onChange={(event) =>
+                      onRatingChange(
+                        row,
+                        Number.parseInt(
+                          event.currentTarget.value,
+                          10,
+                        ) as ArtifactUserRating,
+                      )
+                    }
+                  >
+                    <option value={0}>0</option>
+                    <option value={1}>1</option>
+                    <option value={2}>2</option>
+                    <option value={3}>3</option>
+                    <option value={4}>4</option>
+                    <option value={5}>5</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    className="memoInput"
+                    type="text"
+                    value={review?.memo ?? ""}
+                    onBlur={() => onMemoBlur(row)}
+                    onChange={(event) =>
+                      onMemoChange(artifact.ownedId, event.currentTarget.value)
+                    }
+                  />
+                </td>
+                <td>{artifact.isLocked ? "Yes" : "No"}</td>
+                <td>{artifact.equippedCharacter?.name ?? "-"}</td>
+                <td>
+                  <ul className="skillList">
+                    {artifact.skills.map((skill) => (
+                      <li key={skill.slot}>
+                        {skill.name}: {skill.effectValueText}
+                      </li>
+                    ))}
+                  </ul>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
   );
 }
 
-function getFilteredAndSortedArtifacts(
-  artifacts: Artifact[],
+function getFilteredAndSortedArtifactRows(
+  rows: ReviewedArtifactRow[],
   filters: ArtifactFilters,
   sort: ArtifactSort,
-): Artifact[] {
-  return artifacts
-    .filter((artifact) => matchesFilters(artifact, filters))
+): ReviewedArtifactRow[] {
+  return rows
+    .filter((row) => matchesFilters(row, filters))
     .sort((left, right) => compareArtifacts(left, right, sort));
 }
 
-function matchesFilters(artifact: Artifact, filters: ArtifactFilters): boolean {
+function matchesFilters(
+  row: ReviewedArtifactRow,
+  filters: ArtifactFilters,
+): boolean {
+  const { artifact, review } = row;
   const searchText = filters.searchText.trim().toLowerCase();
 
   if (searchText.length > 0 && !matchesSearchText(artifact, searchText)) {
@@ -429,6 +607,18 @@ function matchesFilters(artifact: Artifact, filters: ArtifactFilters): boolean {
     return false;
   }
 
+  if (filters.rating === "unrated" && (review?.rating ?? 0) !== 0) {
+    return false;
+  }
+
+  if (
+    filters.rating !== "all" &&
+    filters.rating !== "unrated" &&
+    review?.rating !== Number.parseInt(filters.rating, 10)
+  ) {
+    return false;
+  }
+
   return true;
 }
 
@@ -447,21 +637,47 @@ function matchesSearchText(artifact: Artifact, searchText: string): boolean {
 }
 
 function compareArtifacts(
-  left: Artifact,
-  right: Artifact,
+  left: ReviewedArtifactRow,
+  right: ReviewedArtifactRow,
   sort: ArtifactSort,
 ): number {
   const directionMultiplier = sort.direction === "asc" ? 1 : -1;
 
   if (sort.key === "totalScore") {
-    return (left.gameScore.total - right.gameScore.total) * directionMultiplier;
+    return (
+      (left.artifact.gameScore.total - right.artifact.gameScore.total) *
+      directionMultiplier
+    );
   }
 
   if (sort.key === "ownedId") {
-    return (left.ownedId - right.ownedId) * directionMultiplier;
+    return (
+      (left.artifact.ownedId - right.artifact.ownedId) * directionMultiplier
+    );
   }
 
-  return left.name.localeCompare(right.name) * directionMultiplier;
+  if (sort.key === "rating") {
+    return (
+      ((left.review?.rating ?? 0) - (right.review?.rating ?? 0)) *
+      directionMultiplier
+    );
+  }
+
+  return (
+    left.artifact.name.localeCompare(right.artifact.name) * directionMultiplier
+  );
+}
+
+function indexReviewsByOwnedId(
+  reviews: ArtifactUserReview[],
+): Record<number, ArtifactUserReview> {
+  const result: Record<number, ArtifactUserReview> = {};
+
+  for (const review of reviews) {
+    result[review.ownedId] = review;
+  }
+
+  return result;
 }
 
 function getAttributeOptions(artifacts: Artifact[]): string[] {

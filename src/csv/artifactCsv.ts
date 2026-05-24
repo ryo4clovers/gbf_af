@@ -1,4 +1,10 @@
 import type { Artifact, ArtifactSkill } from "../domain/artifact";
+import type { ArtifactUserReview } from "../domain/artifactUserReview";
+
+export type ArtifactCsvRow = {
+  artifact: Artifact;
+  review?: ArtifactUserReview | undefined;
+};
 
 const CSV_HEADERS = [
   "ownedId",
@@ -32,16 +38,26 @@ const CSV_HEADERS = [
   "skill4Value",
   "skill4Quality",
   "skill4Category",
+  "rating",
+  "memo",
 ];
 
 export function convertArtifactsToCsv(artifacts: Artifact[]): string {
-  const rows = artifacts.map((artifact) => {
+  return convertArtifactRowsToCsv(
+    artifacts.map((artifact) => ({
+      artifact,
+    })),
+  );
+}
+
+export function convertArtifactRowsToCsv(rows: ArtifactCsvRow[]): string {
+  const csvRows = rows.map((row) => {
     return CSV_HEADERS.map((header) => {
-      return escapeCsvValue(getArtifactCsvValue(artifact, header));
+      return escapeCsvValue(getArtifactCsvValue(row, header));
     }).join(",");
   });
 
-  return [CSV_HEADERS.join(","), ...rows].join("\r\n");
+  return [CSV_HEADERS.join(","), ...csvRows].join("\r\n");
 }
 
 export function escapeCsvValue(
@@ -57,9 +73,11 @@ export function escapeCsvValue(
 }
 
 function getArtifactCsvValue(
-  artifact: Artifact,
+  row: ArtifactCsvRow,
   header: string,
 ): string | number | boolean | null {
+  const { artifact, review } = row;
+
   switch (header) {
     case "ownedId":
       return artifact.ownedId;
@@ -91,6 +109,10 @@ function getArtifactCsvValue(
       return artifact.gameScore.special;
     case "totalScore":
       return artifact.gameScore.total;
+    case "rating":
+      return review?.rating ?? 0;
+    case "memo":
+      return review?.memo ?? null;
     default:
       return getSkillCsvValue(artifact, header);
   }

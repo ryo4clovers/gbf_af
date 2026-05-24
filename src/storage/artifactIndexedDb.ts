@@ -1,9 +1,11 @@
 import type { Artifact } from "../domain/artifact";
+import type { ArtifactUserReview } from "../domain/artifactUserReview";
 
 const DATABASE_NAME = "gbf-artifact-manager";
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 const ARTIFACT_STORE_NAME = "artifacts";
 const SCAN_METADATA_STORE_NAME = "scanMetadata";
+const ARTIFACT_USER_REVIEW_STORE_NAME = "artifactUserReviews";
 const LAST_SCAN_METADATA_ID = "lastScan";
 
 export type ScanMetadata = {
@@ -83,6 +85,60 @@ export async function clearAllArtifacts(): Promise<void> {
   database.close();
 }
 
+export async function getArtifactUserReviews(): Promise<ArtifactUserReview[]> {
+  const database = await openDatabase();
+  const request = database
+    .transaction(ARTIFACT_USER_REVIEW_STORE_NAME, "readonly")
+    .objectStore(ARTIFACT_USER_REVIEW_STORE_NAME)
+    .getAll();
+  const reviews = await waitForRequest<ArtifactUserReview[]>(request);
+
+  database.close();
+  return reviews;
+}
+
+export async function getArtifactUserReview(
+  ownedId: number,
+): Promise<ArtifactUserReview | null> {
+  const database = await openDatabase();
+  const request = database
+    .transaction(ARTIFACT_USER_REVIEW_STORE_NAME, "readonly")
+    .objectStore(ARTIFACT_USER_REVIEW_STORE_NAME)
+    .get(ownedId);
+  const review = await waitForRequest<ArtifactUserReview | undefined>(request);
+
+  database.close();
+  return review ?? null;
+}
+
+export async function saveArtifactUserReview(
+  review: ArtifactUserReview,
+): Promise<void> {
+  const database = await openDatabase();
+  const transaction = database.transaction(
+    ARTIFACT_USER_REVIEW_STORE_NAME,
+    "readwrite",
+  );
+
+  transaction.objectStore(ARTIFACT_USER_REVIEW_STORE_NAME).put(review);
+
+  await waitForTransaction(transaction);
+  database.close();
+}
+
+export async function clearArtifactUserReviews(): Promise<void> {
+  const database = await openDatabase();
+  const transaction = database.transaction(
+    ARTIFACT_USER_REVIEW_STORE_NAME,
+    "readwrite",
+  );
+
+  transaction.objectStore(ARTIFACT_USER_REVIEW_STORE_NAME).clear();
+
+  await waitForTransaction(transaction);
+  database.close();
+}
+
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
@@ -99,6 +155,14 @@ function openDatabase(): Promise<IDBDatabase> {
       if (!database.objectStoreNames.contains(SCAN_METADATA_STORE_NAME)) {
         database.createObjectStore(SCAN_METADATA_STORE_NAME, {
           keyPath: "id",
+        });
+      }
+
+      if (
+        !database.objectStoreNames.contains(ARTIFACT_USER_REVIEW_STORE_NAME)
+      ) {
+        database.createObjectStore(ARTIFACT_USER_REVIEW_STORE_NAME, {
+          keyPath: "ownedId",
         });
       }
     };

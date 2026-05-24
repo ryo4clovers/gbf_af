@@ -15,8 +15,11 @@ import {
 } from "../state/appState";
 import {
   clearAllArtifacts,
+  clearArtifactUserReviews,
   getAllArtifacts,
+  getArtifactUserReviews,
   getScanMetadata,
+  saveArtifactUserReview,
   saveScannedArtifacts,
 } from "../storage/artifactIndexedDb";
 import {
@@ -86,6 +89,12 @@ async function handleMessage(
       return getStoredArtifactsResponse();
     case "CLEAR_STORED_ARTIFACTS":
       return clearStoredArtifacts();
+    case "GET_ARTIFACT_USER_REVIEWS":
+      return getArtifactUserReviewsResponse();
+    case "SAVE_ARTIFACT_USER_REVIEW":
+      return saveArtifactUserReviewResponse(message.review);
+    case "CLEAR_ARTIFACT_USER_REVIEWS":
+      return clearArtifactUserReviewsResponse();
     case "OPEN_DASHBOARD":
       await chrome.tabs.create({
         url: chrome.runtime.getURL("dashboard.html"),
@@ -330,6 +339,67 @@ async function clearStoredArtifacts(): Promise<ExtensionResponse> {
       "storage_failed",
       "Could not clear stored artifact data.",
     );
+  }
+}
+
+async function getArtifactUserReviewsResponse(): Promise<ExtensionResponse> {
+  try {
+    return {
+      ok: true,
+      type: "ARTIFACT_USER_REVIEWS",
+      reviews: await getArtifactUserReviews(),
+    };
+  } catch (error) {
+    logDebugError("Could not read artifact user reviews", error);
+    return {
+      ok: false,
+      type: "ERROR",
+      message: "Could not read artifact user reviews.",
+      errorCode: "storage_failed",
+    };
+  }
+}
+
+async function saveArtifactUserReviewResponse(
+  review: Parameters<typeof saveArtifactUserReview>[0],
+): Promise<ExtensionResponse> {
+  try {
+    await saveArtifactUserReview(review);
+
+    return {
+      ok: true,
+      type: "SAVE_ARTIFACT_USER_REVIEW_RESULT",
+      review,
+    };
+  } catch (error) {
+    logDebugError("Could not save artifact user review", error, {
+      ownedId: review.ownedId,
+    });
+    return {
+      ok: false,
+      type: "ERROR",
+      message: "Could not save artifact user review.",
+      errorCode: "storage_failed",
+    };
+  }
+}
+
+async function clearArtifactUserReviewsResponse(): Promise<ExtensionResponse> {
+  try {
+    await clearArtifactUserReviews();
+
+    return {
+      ok: true,
+      type: "CLEAR_ARTIFACT_USER_REVIEWS_RESULT",
+    };
+  } catch (error) {
+    logDebugError("Could not clear artifact user reviews", error);
+    return {
+      ok: false,
+      type: "ERROR",
+      message: "Could not clear artifact user reviews.",
+      errorCode: "storage_failed",
+    };
   }
 }
 
