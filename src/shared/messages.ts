@@ -7,6 +7,7 @@ import type { AppMode, ScanErrorCode, ScanState } from "../state/appState";
 export type ExtensionMessage =
   | GetAppStateMessage
   | SetAppModeMessage
+  | PingContentBridgeMessage
   | StartObservingMessage
   | StopObservingMessage
   | StartDisplayModeMessage
@@ -29,6 +30,7 @@ export type ExtensionMessage =
 export type ExtensionResponse =
   | AppStateResponse
   | PageInfoResponse
+  | PongContentBridgeResponse
   | ObservationStatusResponse
   | DisplayStatusResponse
   | DisplayStateResponse
@@ -51,6 +53,10 @@ export type GetAppStateMessage = {
 export type SetAppModeMessage = {
   type: "SET_APP_MODE";
   mode: AppMode;
+};
+
+export type PingContentBridgeMessage = {
+  type: "PING_CONTENT_BRIDGE";
 };
 
 export type StartObservingMessage = {
@@ -146,6 +152,11 @@ export type PageInfoResponse = {
   isGranblueFantasyPage: boolean;
   isArtifactPage: boolean;
   artifactPage: number | null;
+};
+
+export type PongContentBridgeResponse = {
+  ok: true;
+  type: "PONG_CONTENT_BRIDGE";
 };
 
 export type ObservationStatusResponse = {

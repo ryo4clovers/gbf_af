@@ -18,6 +18,7 @@ export type ScanErrorCode =
   | "api_validation_failed"
   | "request_failed"
   | "storage_failed"
+  | "content_bridge_unavailable"
   | "active_tab_unavailable"
   | "unexpected_response";
 

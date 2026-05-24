@@ -47,6 +47,14 @@ let currentMode: AppMode = "scan";
 let currentScanState = initialScanState;
 let currentDisplayState: DisplayState = initialDisplayState;
 
+type ContentBridgePhase =
+  | "content_bridge_ping"
+  | "content_bridge_injection"
+  | "content_bridge_reping"
+  | "observer_injection"
+  | "mode_start_message"
+  | "mode_stop_message";
+
 chrome.runtime.onMessage.addListener(
   (
     message: ExtensionMessage,
@@ -165,15 +173,37 @@ async function startObserving(): Promise<ExtensionResponse> {
   }
 
   try {
+    await ensureContentBridge(tab.id);
+  } catch {
+    return scanErrorResponse(
+      "content_bridge_unavailable",
+      "Could not connect to the GBF page. Please reload the GBF tab and try again.",
+    );
+  }
+
+  try {
     await injectPageObserver(tab.id);
-    await chrome.tabs.sendMessage<ExtensionMessage, ExtensionResponse>(tab.id, {
-      type: "START_OBSERVING",
-    });
   } catch (error) {
-    logDebugError("Could not start observer", error, { tabId: tab.id });
+    logBridgeError("Could not inject page observer", error, {
+      tabId: tab.id,
+      phase: "observer_injection",
+    });
     return scanErrorResponse(
       "unexpected_response",
       "Could not start artifact response observation.",
+    );
+  }
+
+  try {
+    await sendContentBridgeMessage(tab.id, { type: "START_OBSERVING" });
+  } catch (error) {
+    logBridgeError("Could not send scan start message", error, {
+      tabId: tab.id,
+      phase: "mode_start_message",
+    });
+    return scanErrorResponse(
+      "content_bridge_unavailable",
+      "Could not connect to the GBF page. Please reload the GBF tab and try again.",
     );
   }
 
@@ -236,11 +266,13 @@ async function stopObserving(): Promise<ExtensionResponse> {
   }
 
   try {
-    await chrome.tabs.sendMessage<ExtensionMessage, ExtensionResponse>(tab.id, {
-      type: "STOP_OBSERVING",
-    });
+    await ensureContentBridge(tab.id);
+    await sendContentBridgeMessage(tab.id, { type: "STOP_OBSERVING" });
   } catch (error) {
-    logDebugError("Could not stop observer", error, { tabId: tab.id });
+    logBridgeError("Could not send scan stop message", error, {
+      tabId: tab.id,
+      phase: "mode_stop_message",
+    });
   }
 
   let finishedSession: ScanSession | null = null;
@@ -326,15 +358,37 @@ async function startDisplayMode(): Promise<ExtensionResponse> {
   }
 
   try {
+    await ensureContentBridge(tab.id);
+  } catch {
+    return displayErrorResponse(
+      "content_bridge_unavailable",
+      "Could not connect to the GBF page. Please reload the GBF tab and try again.",
+    );
+  }
+
+  try {
     await injectPageObserver(tab.id);
-    await chrome.tabs.sendMessage<ExtensionMessage, ExtensionResponse>(tab.id, {
-      type: "START_DISPLAY_MODE",
-    });
   } catch (error) {
-    logDebugError("Could not start display mode", error, { tabId: tab.id });
+    logBridgeError("Could not inject page observer", error, {
+      tabId: tab.id,
+      phase: "observer_injection",
+    });
     return displayErrorResponse(
       "unexpected_response",
       "Could not start display mode.",
+    );
+  }
+
+  try {
+    await sendContentBridgeMessage(tab.id, { type: "START_DISPLAY_MODE" });
+  } catch (error) {
+    logBridgeError("Could not send display start message", error, {
+      tabId: tab.id,
+      phase: "mode_start_message",
+    });
+    return displayErrorResponse(
+      "content_bridge_unavailable",
+      "Could not connect to the GBF page. Please reload the GBF tab and try again.",
     );
   }
 
@@ -365,11 +419,13 @@ async function stopDisplayMode(): Promise<ExtensionResponse> {
   }
 
   try {
-    await chrome.tabs.sendMessage<ExtensionMessage, ExtensionResponse>(tab.id, {
-      type: "STOP_DISPLAY_MODE",
-    });
+    await ensureContentBridge(tab.id);
+    await sendContentBridgeMessage(tab.id, { type: "STOP_DISPLAY_MODE" });
   } catch (error) {
-    logDebugError("Could not stop display mode", error, { tabId: tab.id });
+    logBridgeError("Could not send display stop message", error, {
+      tabId: tab.id,
+      phase: "mode_stop_message",
+    });
   }
 
   currentDisplayState = {
@@ -540,6 +596,90 @@ async function updateDisplayFromObservedArtifactList(
       "Could not read stored review data for display mode.",
     );
   }
+}
+
+async function ensureContentBridge(tabId: number): Promise<void> {
+  if (await pingContentBridge(tabId, "content_bridge_ping")) {
+    return;
+  }
+
+  try {
+    console.info("[GBF Artifact Manager] content bridge injection requested", {
+      tabId,
+      phase: "content_bridge_injection" satisfies ContentBridgePhase,
+    });
+    await chrome.scripting.executeScript({
+      target: {
+        tabId,
+      },
+      files: ["assets/content.js"],
+    });
+  } catch (error) {
+    logBridgeError("Could not inject content bridge", error, {
+      tabId,
+      phase: "content_bridge_injection",
+    });
+    throw error;
+  }
+
+  if (await pingContentBridge(tabId, "content_bridge_reping")) {
+    return;
+  }
+
+  const error = new Error("Content bridge did not respond after injection.");
+  logBridgeError("Content bridge ping failed after injection", error, {
+    tabId,
+    phase: "content_bridge_reping",
+  });
+  throw error;
+}
+
+async function pingContentBridge(
+  tabId: number,
+  phase: ContentBridgePhase,
+): Promise<boolean> {
+  try {
+    const response = await chrome.tabs.sendMessage<
+      ExtensionMessage,
+      ExtensionResponse
+    >(tabId, {
+      type: "PING_CONTENT_BRIDGE",
+    });
+
+    if (response.ok && response.type === "PONG_CONTENT_BRIDGE") {
+      console.info("[GBF Artifact Manager] content bridge ping ok", {
+        tabId,
+        phase,
+      });
+      return true;
+    }
+
+    logBridgeError(
+      "Content bridge ping returned an invalid response",
+      response,
+      {
+        tabId,
+        phase,
+      },
+    );
+    return false;
+  } catch (error) {
+    logBridgeError("Content bridge ping failed", error, {
+      tabId,
+      phase,
+    });
+    return false;
+  }
+}
+
+async function sendContentBridgeMessage(
+  tabId: number,
+  message: ExtensionMessage,
+): Promise<ExtensionResponse> {
+  return chrome.tabs.sendMessage<ExtensionMessage, ExtensionResponse>(
+    tabId,
+    message,
+  );
 }
 
 async function injectPageObserver(tabId: number): Promise<void> {
@@ -1010,6 +1150,48 @@ function logDebugError(
     ...details,
     error: safeError,
   });
+}
+
+function logBridgeError(
+  context: string,
+  error: unknown,
+  details: {
+    tabId: number;
+    phase: ContentBridgePhase;
+  },
+) {
+  console.error("[GBF Artifact Manager]", context, {
+    ...details,
+    error: normalizeErrorForLog(error),
+  });
+}
+
+function normalizeErrorForLog(error: unknown): {
+  name?: string;
+  message: string;
+} {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+    };
+  }
+
+  if (typeof error === "object" && error !== null) {
+    try {
+      return {
+        message: JSON.stringify(error),
+      };
+    } catch {
+      return {
+        message: String(error),
+      };
+    }
+  }
+
+  return {
+    message: String(error),
+  };
 }
 
 function logZodError(context: string, error: ZodError) {

@@ -393,6 +393,8 @@ function getPopupErrorMessage(response: ErrorResponse): string {
       return "Artifact list response capture failed.";
     case "storage_failed":
       return "Stored artifact data could not be updated.";
+    case "content_bridge_unavailable":
+      return "Could not connect to the GBF page. Please reload the GBF tab and try again.";
     case "active_tab_unavailable":
       return "Active tab could not be identified.";
     case "unexpected_response":
