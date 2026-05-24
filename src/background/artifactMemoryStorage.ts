@@ -36,3 +36,8 @@ export function getStoredArtifactCount(): number {
 export function getLastSuccessfulScanResult(): LastSuccessfulScanResult | null {
   return lastSuccessfulScanResult;
 }
+
+export function clearArtifactsInMemory(): void {
+  artifactsByOwnedId.clear();
+  lastSuccessfulScanResult = null;
+}

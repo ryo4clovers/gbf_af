@@ -1,6 +1,7 @@
 import { ZodError } from "zod";
 import type { ArtifactListResponse } from "../api/artifactListTypes";
 import { fetchArtifactListPage } from "../api/fetchArtifactList";
+import type { Artifact } from "../domain/artifact";
 import { normalizeArtifact } from "../domain/normalizeArtifact";
 import type {
   ErrorResponse,
@@ -12,7 +13,16 @@ import {
   initialScanState,
   type ScanErrorCode,
 } from "../state/appState";
-import { saveSuccessfulScanInMemory } from "./artifactMemoryStorage";
+import {
+  clearAllArtifacts,
+  getAllArtifacts,
+  getScanMetadata,
+  saveScannedArtifacts,
+} from "../storage/artifactIndexedDb";
+import {
+  clearArtifactsInMemory,
+  saveSuccessfulScanInMemory,
+} from "./artifactMemoryStorage";
 
 let currentMode: AppMode = "scan";
 let currentScanState = initialScanState;
@@ -49,6 +59,7 @@ async function handleMessage(
 ): Promise<ExtensionResponse> {
   switch (message.type) {
     case "GET_APP_STATE":
+      currentScanState = await hydratePersistedScanState(currentScanState);
       return {
         ok: true,
         type: "APP_STATE",
@@ -65,6 +76,12 @@ async function handleMessage(
       };
     case "SCAN_CURRENT_PAGE":
       return scanCurrentPage();
+    case "GET_STORED_ARTIFACT_COUNT":
+      return getStoredArtifactCountResponse();
+    case "GET_STORED_ARTIFACTS":
+      return getStoredArtifactsResponse();
+    case "CLEAR_STORED_ARTIFACTS":
+      return clearStoredArtifacts();
     case "OPEN_DASHBOARD":
       await chrome.tabs.create({
         url: chrome.runtime.getURL("dashboard.html"),
@@ -140,6 +157,16 @@ async function scanCurrentPage(): Promise<ExtensionResponse> {
   const artifacts = artifactList.list.map((raw) =>
     normalizeArtifact(raw, scannedAt),
   );
+  const persistenceResult = await persistScannedArtifacts(
+    artifacts,
+    artifactList.current,
+    scannedAt,
+  );
+
+  if (!persistenceResult.ok) {
+    return persistenceResult;
+  }
+
   const storedArtifactCount = saveSuccessfulScanInMemory(
     artifacts,
     artifactList.current,
@@ -152,6 +179,7 @@ async function scanCurrentPage(): Promise<ExtensionResponse> {
     lastPage: artifactList.last,
     totalCount: artifactList.count,
     scannedArtifactCount: storedArtifactCount,
+    persistedArtifactCount: persistenceResult.persistedArtifactCount,
     lastScannedPage: artifactList.current,
     lastScanArtifactCount: artifacts.length,
     scannedPages: addScannedPage(
@@ -171,6 +199,70 @@ async function scanCurrentPage(): Promise<ExtensionResponse> {
     page: artifactList.current,
     scan: currentScanState,
   };
+}
+
+async function getStoredArtifactCountResponse(): Promise<ExtensionResponse> {
+  try {
+    currentScanState = await hydratePersistedScanState(currentScanState);
+
+    return {
+      ok: true,
+      type: "STORED_ARTIFACT_COUNT",
+      artifactCount: currentScanState.persistedArtifactCount,
+      scan: currentScanState,
+    };
+  } catch (error) {
+    logDebugError("Could not read stored artifact count", error);
+    return scanErrorResponse(
+      "storage_failed",
+      "Could not read stored artifact data.",
+    );
+  }
+}
+
+async function getStoredArtifactsResponse(): Promise<ExtensionResponse> {
+  try {
+    const artifacts = await getAllArtifacts();
+    currentScanState = await hydratePersistedScanState(currentScanState);
+
+    return {
+      ok: true,
+      type: "STORED_ARTIFACTS",
+      artifacts,
+      artifactCount: artifacts.length,
+      scan: currentScanState,
+    };
+  } catch (error) {
+    logDebugError("Could not read stored artifacts", error);
+    return scanErrorResponse(
+      "storage_failed",
+      "Could not read stored artifact data.",
+    );
+  }
+}
+
+async function clearStoredArtifacts(): Promise<ExtensionResponse> {
+  try {
+    await clearAllArtifacts();
+    clearArtifactsInMemory();
+    currentScanState = {
+      ...initialScanState,
+      status: "idle",
+    };
+
+    return {
+      ok: true,
+      type: "CLEAR_STORED_ARTIFACTS_RESULT",
+      artifactCount: 0,
+      scan: currentScanState,
+    };
+  } catch (error) {
+    logDebugError("Could not clear stored artifacts", error);
+    return scanErrorResponse(
+      "storage_failed",
+      "Could not clear stored artifact data.",
+    );
+  }
 }
 
 async function getPageInfo(tabId: number): Promise<ExtensionResponse> {
@@ -217,6 +309,66 @@ async function fetchCurrentArtifactList(page: number): Promise<
       "Artifact list request failed. Check the GBF page and network state.",
     );
   }
+}
+
+async function persistScannedArtifacts(
+  artifacts: Artifact[],
+  scannedPage: number,
+  scannedAt: string,
+): Promise<
+  | {
+      ok: true;
+      persistedArtifactCount: number;
+    }
+  | ErrorResponse
+> {
+  try {
+    await saveScannedArtifacts({
+      artifacts,
+      scannedPage,
+      scannedAt,
+    });
+
+    const persistedArtifactCount = (await getAllArtifacts()).length;
+
+    return {
+      ok: true,
+      persistedArtifactCount,
+    };
+  } catch (error) {
+    logDebugError("Could not persist scanned artifacts", error, {
+      artifactCount: artifacts.length,
+      scannedPage,
+    });
+    return scanErrorResponse(
+      "storage_failed",
+      "Could not save scanned artifacts.",
+    );
+  }
+}
+
+async function hydratePersistedScanState(
+  scanState: typeof currentScanState,
+): Promise<typeof currentScanState> {
+  const [artifacts, metadata] = await Promise.all([
+    getAllArtifacts(),
+    getScanMetadata(),
+  ]);
+
+  if (metadata === null) {
+    return {
+      ...scanState,
+      persistedArtifactCount: artifacts.length,
+    };
+  }
+
+  return {
+    ...scanState,
+    persistedArtifactCount: artifacts.length,
+    lastScannedPage: metadata.scannedPage,
+    lastScanArtifactCount: metadata.artifactCount,
+    lastScannedAt: metadata.scannedAt,
+  };
 }
 
 async function getActiveTab(): Promise<chrome.tabs.Tab | null> {

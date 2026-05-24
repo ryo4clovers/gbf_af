@@ -1,9 +1,13 @@
+import type { Artifact } from "../domain/artifact";
 import type { AppMode, ScanErrorCode, ScanState } from "../state/appState";
 
 export type ExtensionMessage =
   | GetAppStateMessage
   | SetAppModeMessage
   | ScanCurrentPageMessage
+  | GetStoredArtifactCountMessage
+  | GetStoredArtifactsMessage
+  | ClearStoredArtifactsMessage
   | OpenDashboardMessage
   | GetPageInfoMessage;
 
@@ -11,6 +15,9 @@ export type ExtensionResponse =
   | AppStateResponse
   | PageInfoResponse
   | ScanCurrentPageResponse
+  | StoredArtifactCountResponse
+  | StoredArtifactsResponse
+  | ClearStoredArtifactsResponse
   | OpenDashboardResponse
   | ErrorResponse;
 
@@ -25,6 +32,18 @@ export type SetAppModeMessage = {
 
 export type ScanCurrentPageMessage = {
   type: "SCAN_CURRENT_PAGE";
+};
+
+export type GetStoredArtifactCountMessage = {
+  type: "GET_STORED_ARTIFACT_COUNT";
+};
+
+export type GetStoredArtifactsMessage = {
+  type: "GET_STORED_ARTIFACTS";
+};
+
+export type ClearStoredArtifactsMessage = {
+  type: "CLEAR_STORED_ARTIFACTS";
 };
 
 export type OpenDashboardMessage = {
@@ -57,6 +76,28 @@ export type ScanCurrentPageResponse = {
   message: string;
   artifactCount: number;
   page: number;
+  scan: ScanState;
+};
+
+export type StoredArtifactCountResponse = {
+  ok: true;
+  type: "STORED_ARTIFACT_COUNT";
+  artifactCount: number;
+  scan: ScanState;
+};
+
+export type StoredArtifactsResponse = {
+  ok: true;
+  type: "STORED_ARTIFACTS";
+  artifacts: Artifact[];
+  artifactCount: number;
+  scan: ScanState;
+};
+
+export type ClearStoredArtifactsResponse = {
+  ok: true;
+  type: "CLEAR_STORED_ARTIFACTS_RESULT";
+  artifactCount: number;
   scan: ScanState;
 };
 

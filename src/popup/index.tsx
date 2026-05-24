@@ -45,6 +45,13 @@ function Popup() {
     handleResponse(response);
   };
 
+  const clearStoredData = async () => {
+    const response = await sendRuntimeMessage({
+      type: "CLEAR_STORED_ARTIFACTS",
+    });
+    handleResponse(response);
+  };
+
   const handleResponse = (response: ExtensionResponse) => {
     if (!response.ok) {
       if (response.scan !== undefined) {
@@ -64,6 +71,18 @@ function Popup() {
     if (response.type === "SCAN_CURRENT_PAGE_RESULT") {
       setScanState(response.scan);
       setStatusMessage(response.message);
+      return;
+    }
+
+    if (response.type === "STORED_ARTIFACT_COUNT") {
+      setScanState(response.scan);
+      setStatusMessage(`Stored artifacts: ${response.artifactCount}.`);
+      return;
+    }
+
+    if (response.type === "CLEAR_STORED_ARTIFACTS_RESULT") {
+      setScanState(response.scan);
+      setStatusMessage("Stored artifact data cleared.");
       return;
     }
 
@@ -116,8 +135,8 @@ function Popup() {
           <strong>{scan.scannedPages.length}</strong>
         </div>
         <div>
-          <span>Stored artifacts</span>
-          <strong>{scan.scannedArtifactCount}</strong>
+          <span>Persisted</span>
+          <strong>{scan.persistedArtifactCount}</strong>
         </div>
       </section>
 
@@ -127,6 +146,9 @@ function Popup() {
         </button>
         <button type="button" onClick={openDashboard}>
           Open Dashboard
+        </button>
+        <button type="button" onClick={clearStoredData} disabled={isScanning}>
+          Clear Stored Data
         </button>
       </section>
 
@@ -145,6 +167,8 @@ function getPopupErrorMessage(response: ErrorResponse): string {
       return "Artifact API response format was not recognized.";
     case "request_failed":
       return "Artifact list request failed. Check the GBF page and network state.";
+    case "storage_failed":
+      return "Stored artifact data could not be updated.";
     case "active_tab_unavailable":
       return "Active tab could not be identified.";
     case "unexpected_response":

@@ -24,6 +24,24 @@ button:hover {
   background: #eef2f6;
 }
 
+button:disabled {
+  color: #7b8794;
+  background: #eef2f6;
+  cursor: default;
+}
+
+input,
+select {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid #c7ced8;
+  border-radius: 6px;
+  padding: 7px 8px;
+  color: #1f2933;
+  font: inherit;
+  background: #ffffff;
+}
+
 .dashboard {
   box-sizing: border-box;
   min-height: 100vh;
@@ -126,6 +144,77 @@ button:hover {
   color: #52616f;
 }
 
+.panelHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.emptyState {
+  padding: 24px 0;
+}
+
+.tableControls {
+  margin-top: 16px;
+  border-top: 1px solid #e4e8ef;
+  padding-top: 16px;
+}
+
+.filterGrid {
+  display: grid;
+  grid-template-columns: minmax(220px, 2fr) repeat(5, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.filterGrid label {
+  display: grid;
+  gap: 6px;
+  color: #52616f;
+  font-size: 12px;
+}
+
+.resultCount {
+  margin-top: 10px;
+  color: #52616f;
+  font-size: 13px;
+}
+
+.tableScroller {
+  margin-top: 16px;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+th,
+td {
+  border-bottom: 1px solid #e4e8ef;
+  padding: 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  color: #52616f;
+  font-weight: 600;
+  background: #f7f8fa;
+}
+
+.skillList {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.skillList li + li {
+  margin-top: 4px;
+}
+
 @media (max-width: 800px) {
   .topBar,
   .workspace {
@@ -140,5 +229,9 @@ button:hover {
 
   .statusGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filterGrid {
+    grid-template-columns: 1fr;
   }
 }

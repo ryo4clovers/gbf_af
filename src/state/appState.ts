@@ -9,6 +9,7 @@ export type ScanErrorCode =
   | "page_number_not_detected"
   | "api_validation_failed"
   | "request_failed"
+  | "storage_failed"
   | "active_tab_unavailable"
   | "unexpected_response";
 
@@ -18,6 +19,7 @@ export type ScanState = {
   lastPage: number | null;
   totalCount: number | null;
   scannedArtifactCount: number;
+  persistedArtifactCount: number;
   lastScannedPage: number | null;
   lastScanArtifactCount: number;
   scannedPages: number[];
@@ -40,6 +42,7 @@ export const initialScanState: ScanState = {
   lastPage: null,
   totalCount: null,
   scannedArtifactCount: 0,
+  persistedArtifactCount: 0,
   lastScannedPage: null,
   lastScanArtifactCount: 0,
   scannedPages: [],
