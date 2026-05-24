@@ -144,6 +144,10 @@ select {
   color: #52616f;
 }
 
+.panelAction {
+  margin-top: 16px;
+}
+
 .panelHeader {
   display: flex;
   align-items: flex-start;

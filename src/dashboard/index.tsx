@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { convertArtifactsToCsv } from "../csv/artifactCsv";
 import type { Artifact } from "../domain/artifact";
 import { sendRuntimeMessage } from "../shared/chromeMessages";
 import type { ExtensionResponse } from "../shared/messages";
@@ -82,6 +83,19 @@ function Dashboard() {
   useEffect(() => {
     loadArtifacts();
   }, [loadArtifacts]);
+
+  const exportCsv = () => {
+    if (filteredArtifacts.length === 0) {
+      setStatusMessage("No artifacts match the current filters.");
+      return;
+    }
+
+    downloadCsvFile(
+      convertArtifactsToCsv(filteredArtifacts),
+      createArtifactCsvFileName(new Date()),
+    );
+    setStatusMessage(`Exported ${filteredArtifacts.length} artifacts.`);
+  };
 
   return (
     <main className="dashboard">
@@ -166,7 +180,15 @@ function Dashboard() {
         </div>
         <div className="panel">
           <h2>CSV Export</h2>
-          <p>CSV export will use only locally stored artifact data.</p>
+          <p>Exports the current filtered artifact list.</p>
+          <button
+            className="panelAction"
+            type="button"
+            onClick={exportCsv}
+            disabled={filteredArtifacts.length === 0}
+          >
+            Export CSV
+          </button>
         </div>
       </section>
     </main>
@@ -452,6 +474,34 @@ function getKindOptions(artifacts: Artifact[]): string[] {
   return Array.from(
     new Set(artifacts.map((artifact) => artifact.kind.label)),
   ).sort((left, right) => left.localeCompare(right));
+}
+
+function downloadCsvFile(csv: string, fileName: string) {
+  const blob = new Blob([`\uFEFF${csv}`], {
+    type: "text/csv;charset=utf-8",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function createArtifactCsvFileName(date: Date): string {
+  const year = date.getFullYear();
+  const month = padDatePart(date.getMonth() + 1);
+  const day = padDatePart(date.getDate());
+  const hours = padDatePart(date.getHours());
+  const minutes = padDatePart(date.getMinutes());
+  const seconds = padDatePart(date.getSeconds());
+
+  return `gbf-artifacts-${year}${month}${day}-${hours}${minutes}${seconds}.csv`;
+}
+
+function padDatePart(value: number): string {
+  return String(value).padStart(2, "0");
 }
 
 const rootElement = document.getElementById("root");
