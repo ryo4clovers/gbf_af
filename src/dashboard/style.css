@@ -155,6 +155,69 @@ select {
   gap: 16px;
 }
 
+.sectionHeader h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.sectionHeader p {
+  margin: 4px 0 0;
+}
+
+.statisticsSection {
+  margin-top: 16px;
+  border-top: 1px solid #e4e8ef;
+  padding-top: 16px;
+}
+
+.summaryCards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.summaryCard {
+  border: 1px solid #e4e8ef;
+  border-radius: 6px;
+  padding: 10px;
+  background: #fafbfc;
+}
+
+.summaryCard span {
+  display: block;
+  color: #697586;
+  font-size: 12px;
+}
+
+.summaryCard strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 18px;
+}
+
+.statisticsTables {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.compactTable h4 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.compactTable table {
+  min-width: 0;
+  font-size: 12px;
+}
+
+.compactTable th,
+.compactTable td {
+  padding: 6px;
+}
+
 .emptyState {
   padding: 24px 0;
 }
@@ -241,6 +304,11 @@ th {
 
   .statusGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .summaryCards,
+  .statisticsTables {
+    grid-template-columns: 1fr;
   }
 
   .filterGrid {

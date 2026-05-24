@@ -9,6 +9,10 @@ import type {
 import type { ArtifactPresence } from "../domain/scanSession";
 import { sendRuntimeMessage } from "../shared/chromeMessages";
 import { useAppStore } from "../state/appState";
+import {
+  type ArtifactStatistics,
+  calculateArtifactStatistics,
+} from "../statistics/artifactStatistics";
 import "./style.css";
 
 type LockedFilter = "all" | "locked" | "unlocked";
@@ -70,6 +74,11 @@ function Dashboard() {
     review: reviewsByOwnedId[artifact.ownedId] ?? null,
     presence: presenceByOwnedId[artifact.ownedId] ?? null,
   }));
+  const statistics = calculateArtifactStatistics({
+    artifacts,
+    userReviews: Object.values(reviewsByOwnedId),
+    artifactPresence: Object.values(presenceByOwnedId),
+  });
   const filteredRows = getFilteredAndSortedArtifactRows(
     artifactRows,
     filters,
@@ -262,6 +271,8 @@ function Dashboard() {
             </button>
           </div>
 
+          <StatisticsSummary statistics={statistics} />
+
           <ArtifactControls
             artifactCount={artifacts.length}
             attributeOptions={attributeOptions}
@@ -313,6 +324,185 @@ function Dashboard() {
         </div>
       </section>
     </main>
+  );
+}
+
+function StatisticsSummary({ statistics }: { statistics: ArtifactStatistics }) {
+  const topSkillCounts = statistics.skillCounts.slice(0, 10);
+
+  return (
+    <section className="statisticsSection" aria-label="Artifact statistics">
+      <div className="sectionHeader">
+        <div>
+          <h3>Statistics</h3>
+          <p>Statistics are based on all stored artifacts.</p>
+        </div>
+      </div>
+
+      <div className="summaryCards">
+        <SummaryCard
+          label="Stored"
+          value={statistics.overall.totalArtifactCount}
+        />
+        <SummaryCard
+          label="Active"
+          value={statistics.overall.activeArtifactCount}
+        />
+        <SummaryCard
+          label="Possibly deleted"
+          value={statistics.overall.possiblyDeletedArtifactCount}
+        />
+        <SummaryCard
+          label="Unrated"
+          value={statistics.overall.unratedArtifactCount}
+        />
+        <SummaryCard
+          label="Average score"
+          value={formatOptionalNumber(statistics.overall.averageGameTotalScore)}
+        />
+        <SummaryCard
+          label="Highest score"
+          value={statistics.overall.highestGameTotalScore ?? "-"}
+        />
+        <SummaryCard
+          label="Locked"
+          value={statistics.overall.lockedArtifactCount}
+        />
+        <SummaryCard
+          label="Equipped"
+          value={statistics.overall.equippedArtifactCount}
+        />
+      </div>
+
+      <div className="statisticsTables">
+        <RatingDistributionTable statistics={statistics} />
+        <DistributionTable
+          title="Attributes"
+          rows={statistics.attributeCounts}
+        />
+        <DistributionTable title="Kinds" rows={statistics.kindCounts} />
+        <SkillStatisticsTable rows={topSkillCounts} />
+      </div>
+    </section>
+  );
+}
+
+function SummaryCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <div className="summaryCard">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function RatingDistributionTable({
+  statistics,
+}: {
+  statistics: ArtifactStatistics;
+}) {
+  return (
+    <div className="compactTable">
+      <h4>Ratings</h4>
+      <table>
+        <thead>
+          <tr>
+            <th>Rating</th>
+            <th>Count</th>
+          </tr>
+        </thead>
+        <tbody>
+          {([0, 1, 2, 3, 4, 5] as const).map((rating) => (
+            <tr key={rating}>
+              <td>{rating}</td>
+              <td>{statistics.ratingCounts[rating]}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function DistributionTable({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: ArtifactStatistics["attributeCounts"];
+}) {
+  return (
+    <div className="compactTable">
+      <h4>{title}</h4>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Total</th>
+            <th>Possibly deleted</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={3}>No data</td>
+            </tr>
+          ) : (
+            rows.map((row) => (
+              <tr key={row.label}>
+                <td>{row.label}</td>
+                <td>{row.count}</td>
+                <td>{row.possiblyDeletedCount}</td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SkillStatisticsTable({
+  rows,
+}: {
+  rows: ArtifactStatistics["skillCounts"];
+}) {
+  return (
+    <div className="compactTable">
+      <h4>Top Skills</h4>
+      <table>
+        <thead>
+          <tr>
+            <th>Skill</th>
+            <th>Count</th>
+            <th>Max</th>
+            <th>Average</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={4}>No data</td>
+            </tr>
+          ) : (
+            rows.map((row) => (
+              <tr key={row.name}>
+                <td>{row.name}</td>
+                <td>{row.count}</td>
+                <td>{formatOptionalNumber(row.maxNumericEffectValue)}</td>
+                <td>{formatOptionalNumber(row.averageNumericEffectValue)}</td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -768,6 +958,18 @@ function createArtifactCsvFileName(date: Date): string {
   const seconds = padDatePart(date.getSeconds());
 
   return `gbf-artifacts-${year}${month}${day}-${hours}${minutes}${seconds}.csv`;
+}
+
+function formatOptionalNumber(value: number | null): string {
+  if (value === null) {
+    return "-";
+  }
+
+  if (Number.isInteger(value)) {
+    return String(value);
+  }
+
+  return value.toFixed(2);
 }
 
 function padDatePart(value: number): string {
