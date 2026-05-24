@@ -1,0 +1,221 @@
+{
+  // ============================================================================
+  // Workbench / UI
+  // ============================================================================
+  "workbench.colorTheme": "Dark Modern", // カラーテーマ
+  "workbench.iconTheme": "vscode-icons", // ファイルアイコンテーマ
+  "workbench.activityBar.compact": true, // Activity Bar をコンパクト表示
+  "workbench.tree.renderIndentGuides": "always", // ツリーのインデントガイドを常時表示
+  "workbench.tree.indent": 20, // ツリーのインデント幅
+  "workbench.editor.wrapTabs": true, // エディタタブを複数行に折り返す
+  "workbench.editor.enablePreview": true, // ファイルクリック時にプレビューエディタで開く
+  "workbench.editor.closeOnFileDelete": true, // ファイル削除時に開いているエディタも閉じる
+  "workbench.editor.pinnedTabsOnSeparateRow": true, // ピン留めタブを別行に表示
+
+  "workbench.colorCustomizations": {
+    "tree.indentGuidesStroke": "#ffa500", // ツリーインデントガイドの色
+    "editorWarning.background": "#817f0028", // 警告箇所の背景色
+    "editorError.background": "#8e00003c" // エラー箇所の背景色
+  },
+
+  // ============================================================================
+  // Explorer
+  // ============================================================================
+  "explorer.compactFolders": false, // フォルダを省略表示せず階層ごとに表示
+
+  // ============================================================================
+  // Editor - 表示 / 操作感
+  // ============================================================================
+  "editor.minimap.enabled": false, // ミニマップを非表示
+  "editor.wordWrap": "off", // 折り返しを無効化
+  "editor.renderControlCharacters": true, // 制御文字を可視化
+  "editor.renderWhitespace": "all", // 空白文字を可視化
+  "editor.renderLineHighlight": "all", // 現在行を行全体でハイライト
+  "editor.guides.bracketPairs": true, // 括弧ペアのガイドを表示
+  "editor.bracketPairColorization.enabled": true, // 括弧ペアを色分け
+  "editor.showFoldingControls": "never", // 折りたたみアイコンを非表示
+  "editor.snippetSuggestions": "top", // スニペット候補を上部に表示
+  "editor.inlineSuggest.enabled": true, // インライン補完を有効化
+
+  // ============================================================================
+  // Editor - フォント / インデント
+  // ============================================================================
+  "editor.fontFamily": "'PlemolJP Console NF', monospace", // エディタフォント
+  "editor.fontSize": 14, // エディタフォントサイズ
+  "editor.tabSize": 4, // 全体のデフォルトタブ幅
+  "editor.insertSpaces": true, // タブ入力時にスペースを挿入
+  "editor.detectIndentation": false, // 既存ファイルからのインデント推測を無効化
+
+  // ============================================================================
+  // Format / Code Actions
+  // ============================================================================
+  "editor.formatOnSave": true, // 保存時に自動整形
+  "editor.defaultFormatter": "esbenp.prettier-vscode", // 未指定言語の既定フォーマッタ
+
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "explicit", // 明示的保存時に import を整理
+    "source.fixAll.eslint": "explicit" // 明示的保存時に ESLint の自動修正を実行
+  },
+
+  "js/ts.updateImportsOnFileMove.enabled": "always", // JS/TS ファイル移動時に import パスを自動更新
+
+  // ============================================================================
+  // Files - 保存 / 文字コード / 改行
+  // ============================================================================
+  "files.autoSave": "off", // 自動保存を無効化
+  "files.eol": "\n", // 改行コードを LF に統一
+  "files.encoding": "utf8", // 文字コードを UTF-8 に統一
+  "files.trimTrailingWhitespace": true, // 行末空白を削除
+  "files.insertFinalNewline": true, // ファイル末尾に改行を追加
+  "files.trimFinalNewlines": true, // ファイル末尾の余分な空行を削除
+
+  // ============================================================================
+  // Terminal
+  // ============================================================================
+  "terminal.integrated.defaultProfile.windows": "PowerShell", // Windows のデフォルトターミナルを PowerShell に設定
+  // "terminal.integrated.defaultProfile.windows": "Git Bash", // Windows のデフォルトターミナルを Git Bash に設定
+  // "terminal.integrated.defaultProfile.windows": "WSL", // Windows のデフォルトターミナルを WSL に設定
+  // "terminal.integrated.defaultProfile.windows": "Command Prompt", // Windows のデフォルトターミナルを Command Prompt に設定
+  "terminal.integrated.fontSize": 14, // ターミナルフォントサイズ
+
+  // ============================================================================
+  // Search / Exclude
+  // ============================================================================
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/.git": true,
+    "**/dist": true
+  },
+
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true
+  },
+
+  // ============================================================================
+  // Language Overrides - Biome
+  // ============================================================================
+  "[javascript]": {
+    "editor.tabSize": 2,
+    "editor.defaultFormatter": "biomejs.biome" // JavaScript は Biome
+  },
+
+  "[typescript]": {
+    "editor.tabSize": 2,
+    "editor.defaultFormatter": "biomejs.biome" // TypeScript は Biome
+  },
+
+  "[javascriptreact]": {
+    "editor.tabSize": 2,
+    "editor.defaultFormatter": "biomejs.biome" // JSX は Biome
+  },
+
+  "[typescriptreact]": {
+    "editor.tabSize": 2,
+    "editor.defaultFormatter": "biomejs.biome" // TSX は Biome
+  },
+
+  // ============================================================================
+  // Language Overrides - Prettier
+  // ============================================================================
+  "[json]": {
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode" // JSON は Prettier
+  },
+
+  "[jsonc]": {
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode" // JSONC は Prettier
+  },
+
+  "[css]": {
+    "editor.tabSize": 2,
+    "editor.defaultFormatter": "esbenp.prettier-vscode" // CSS は Prettier
+  },
+
+  "[html]": {
+    "editor.tabSize": 2,
+    "editor.defaultFormatter": "esbenp.prettier-vscode" // HTML は Prettier
+  },
+
+  "[vue]": {
+    "editor.tabSize": 2,
+    "editor.defaultFormatter": "esbenp.prettier-vscode" // Vue SFC は Prettier
+  },
+
+  "[yaml]": {
+    "editor.tabSize": 2,
+    "editor.defaultFormatter": "esbenp.prettier-vscode" // YAML は Prettier
+  },
+
+  // ============================================================================
+  // Language Overrides - Markdown
+  // ============================================================================
+  "[markdown]": {
+    "editor.tabSize": 2,
+    "editor.wordWrap": "off", // Markdown でも折り返しを無効化
+    "files.trimTrailingWhitespace": false, // Markdown の改行表現を壊さないため無効化
+    "editor.quickSuggestions": {
+      "other": "on",
+      "comments": "on",
+      "strings": "on"
+    },
+    "editor.defaultFormatter": "yzhang.markdown-all-in-one" // Markdown は専用拡張
+  },
+
+  // ============================================================================
+  // Language Overrides - Python
+  // ============================================================================
+  "[python]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "charliermarsh.ruff", // Python は Ruff
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    }
+  },
+
+  // ============================================================================
+  // Language Overrides - C / Rust
+  // ============================================================================
+  "[c]": {
+    "editor.formatOnSave": false, // C は保存時整形を無効化
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "never"
+    }
+  },
+
+  "[rust]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "rust-lang.rust-analyzer" // Rust は rust-analyzer / rustfmt
+  },
+
+  // ============================================================================
+  // Extensions
+  // ============================================================================
+  "extensions.ignoreRecommendations": false, // 拡張機能のおすすめ通知を表示
+
+  // ============================================================================
+  // Markdown Extension
+  // ============================================================================
+  "markdown.extension.showActionButtons": true, // Markdown プレビューのアクションボタンを表示
+  "markdown.copyFiles.destination": {
+    "**/*": "${documentDirName}/${documentBaseName}/${fileName}" // Markdown への画像貼り付け時の保存先
+  },
+
+  // ============================================================================
+  // GitHub Copilot
+  // ============================================================================
+  "github.copilot.enable": {
+    "*": true,
+    "markdown": true,
+    "plaintext": false
+  },
+  "github.copilot.nextEditSuggestions.enabled": true,
+  "github.copilot.chat.localeOverride": "ja",
+  "github.copilot.chat.codeGeneration.useInstructionFiles": true,
+  "chat.mcp.gallery.enabled": true
+  // "chatgpt.localeOverride": "ja-JP"
+}

@@ -1,0 +1,488 @@
+{
+  "[SQL Common] SELECT": {
+    "scope": "sql",
+    "prefix": "/select",
+    "body": [
+      "SELECT",
+      "    ${1:column}",
+      "FROM",
+      "    ${2:table}",
+      "WHERE",
+      "    ${3:condition};"
+    ],
+    "description": "Basic SELECT query"
+  },
+  "[SQL Common] SELECT ALL": {
+    "scope": "sql",
+    "prefix": "/selectall",
+    "body": [
+      "SELECT",
+      "    *",
+      "FROM",
+      "    ${1:table};"
+    ],
+    "description": "SELECT all rows"
+  },
+  "[SQL Common] INSERT": {
+    "scope": "sql",
+    "prefix": "/insert",
+    "body": [
+      "INSERT INTO ${1:table} (",
+      "    ${2:column}",
+      ") VALUES (",
+      "    ${3:value}",
+      ");"
+    ],
+    "description": "INSERT statement"
+  },
+  "[SQL Common] UPDATE": {
+    "scope": "sql",
+    "prefix": "/update",
+    "body": [
+      "UPDATE ${1:table}",
+      "SET",
+      "    ${2:column} = ${3:value}",
+      "WHERE",
+      "    ${4:condition};"
+    ],
+    "description": "UPDATE statement"
+  },
+  "[SQL Common] DELETE": {
+    "scope": "sql",
+    "prefix": "/delete",
+    "body": [
+      "DELETE FROM ${1:table}",
+      "WHERE",
+      "    ${2:condition};"
+    ],
+    "description": "DELETE statement"
+  },
+  "[SQL Common] INNER JOIN": {
+    "scope": "sql",
+    "prefix": "/join",
+    "body": [
+      "SELECT",
+      "    ${1:a}.${2:id},",
+      "    ${3:b}.${4:name}",
+      "FROM",
+      "    ${5:table_a} ${1:a}",
+      "INNER JOIN",
+      "    ${6:table_b} ${3:b}",
+      "    ON ${1:a}.${7:id} = ${3:b}.${7:id};"
+    ],
+    "description": "INNER JOIN query"
+  },
+  "[SQL Common] LEFT JOIN": {
+    "scope": "sql",
+    "prefix": "/leftjoin",
+    "body": [
+      "SELECT",
+      "    ${1:a}.${2:id},",
+      "    ${3:b}.${4:name}",
+      "FROM",
+      "    ${5:table_a} ${1:a}",
+      "LEFT JOIN",
+      "    ${6:table_b} ${3:b}",
+      "    ON ${1:a}.${7:id} = ${3:b}.${7:id};"
+    ],
+    "description": "LEFT JOIN query"
+  },
+  "[SQL Common] GROUP BY": {
+    "scope": "sql",
+    "prefix": "/groupby",
+    "body": [
+      "SELECT",
+      "    ${1:column},",
+      "    COUNT(*) AS total_count",
+      "FROM",
+      "    ${2:table}",
+      "GROUP BY",
+      "    ${1:column};"
+    ],
+    "description": "GROUP BY query"
+  },
+  "[SQL Common] CTE": {
+    "scope": "sql",
+    "prefix": "/cte",
+    "body": [
+      "WITH ${1:cte_name} AS (",
+      "    SELECT",
+      "        ${2:*}",
+      "    FROM",
+      "        ${3:table}",
+      ")",
+      "SELECT",
+      "    *",
+      "FROM",
+      "    ${1:cte_name};"
+    ],
+    "description": "Common Table Expression"
+  },
+  "[SQL Common] EXISTS": {
+    "scope": "sql",
+    "prefix": "/exists",
+    "body": [
+      "WHERE EXISTS (",
+      "    SELECT 1",
+      "    FROM ${1:table}",
+      "    WHERE ${2:condition}",
+      ")"
+    ],
+    "description": "WHERE EXISTS clause"
+  },
+  "[SQL Common] CASE": {
+    "scope": "sql",
+    "prefix": "/case",
+    "body": [
+      "CASE",
+      "    WHEN ${1:condition} THEN ${2:value}",
+      "    ELSE ${3:default_value}",
+      "END"
+    ],
+    "description": "CASE expression"
+  },
+  "[SQL Common] Transaction": {
+    "scope": "sql",
+    "prefix": "/txn",
+    "body": [
+      "BEGIN TRANSACTION;",
+      "",
+      "${1}",
+      "",
+      "COMMIT;"
+    ],
+    "description": "Transaction block"
+  },
+  "[MSSQL] SELECT TOP": {
+    "scope": "sql",
+    "prefix": "/mssql_top",
+    "body": [
+      "SELECT TOP (${1:100})",
+      "    ${2:*}",
+      "FROM",
+      "    ${3:table}",
+      "ORDER BY",
+      "    ${4:column};"
+    ],
+    "description": "SQL Server SELECT TOP"
+  },
+  "[MSSQL] Paging OFFSET FETCH": {
+    "scope": "sql",
+    "prefix": "/mssql_page",
+    "body": [
+      "SELECT",
+      "    ${1:*}",
+      "FROM",
+      "    ${2:table}",
+      "ORDER BY",
+      "    ${3:column}",
+      "OFFSET ${4:0} ROWS",
+      "FETCH NEXT ${5:100} ROWS ONLY;"
+    ],
+    "description": "SQL Server paging with OFFSET FETCH"
+  },
+  "[MSSQL] Create Table": {
+    "scope": "sql",
+    "prefix": "/mssql_table",
+    "body": [
+      "CREATE TABLE ${1:dbo}.${2:table_name} (",
+      "    id INT IDENTITY(1,1) NOT NULL,",
+      "    ${3:name} NVARCHAR(${4:100}) NOT NULL,",
+      "    created_at DATETIME2(3) NOT NULL CONSTRAINT DF_${2:table_name}_created_at DEFAULT SYSUTCDATETIME(),",
+      "    CONSTRAINT PK_${2:table_name} PRIMARY KEY (id)",
+      ");"
+    ],
+    "description": "SQL Server CREATE TABLE"
+  },
+  "[MSSQL] Create Index": {
+    "scope": "sql",
+    "prefix": "/mssql_index",
+    "body": [
+      "CREATE INDEX IX_${1:table}_${2:column}",
+      "ON ${3:dbo}.${1:table} (${2:column});"
+    ],
+    "description": "SQL Server CREATE INDEX"
+  },
+  "[MSSQL] Create Unique Index": {
+    "scope": "sql",
+    "prefix": "/mssql_uindex",
+    "body": [
+      "CREATE UNIQUE INDEX UX_${1:table}_${2:column}",
+      "ON ${3:dbo}.${1:table} (${2:column});"
+    ],
+    "description": "SQL Server CREATE UNIQUE INDEX"
+  },
+  "[MSSQL] Stored Procedure": {
+    "scope": "sql",
+    "prefix": "/mssql_proc",
+    "body": [
+      "CREATE OR ALTER PROCEDURE ${1:dbo}.${2:procedure_name}",
+      "    @${3:param} ${4:NVARCHAR(100)}",
+      "AS",
+      "BEGIN",
+      "    SET NOCOUNT ON;",
+      "",
+      "    ${0}",
+      "END;"
+    ],
+    "description": "SQL Server stored procedure"
+  },
+  "[MSSQL] Variable": {
+    "scope": "sql",
+    "prefix": "/mssql_var",
+    "body": [
+      "DECLARE @${1:name} ${2:INT} = ${3:value};"
+    ],
+    "description": "SQL Server variable declaration"
+  },
+  "[MSSQL] IF EXISTS DROP TABLE": {
+    "scope": "sql",
+    "prefix": "/mssql_droptable",
+    "body": [
+      "DROP TABLE IF EXISTS ${1:dbo}.${2:table_name};"
+    ],
+    "description": "SQL Server DROP TABLE IF EXISTS"
+  },
+  "[MSSQL] Upsert MERGE": {
+    "scope": "sql",
+    "prefix": "/mssql_merge",
+    "body": [
+      "MERGE INTO ${1:dbo}.${2:target_table} AS target",
+      "USING (",
+      "    SELECT",
+      "        ${3:id} AS ${3:id},",
+      "        ${4:value} AS ${4:value}",
+      ") AS source",
+      "ON target.${3:id} = source.${3:id}",
+      "WHEN MATCHED THEN",
+      "    UPDATE SET",
+      "        target.${4:value} = source.${4:value}",
+      "WHEN NOT MATCHED THEN",
+      "    INSERT (${3:id}, ${4:value})",
+      "    VALUES (source.${3:id}, source.${4:value});"
+    ],
+    "description": "SQL Server MERGE upsert"
+  },
+  "[MSSQL] TRY CATCH Transaction": {
+    "scope": "sql",
+    "prefix": "/mssql_txn",
+    "body": [
+      "BEGIN TRY",
+      "    BEGIN TRANSACTION;",
+      "",
+      "    ${1}",
+      "",
+      "    COMMIT TRANSACTION;",
+      "END TRY",
+      "BEGIN CATCH",
+      "    IF @@TRANCOUNT > 0",
+      "        ROLLBACK TRANSACTION;",
+      "",
+      "    THROW;",
+      "END CATCH;"
+    ],
+    "description": "SQL Server TRY CATCH transaction"
+  },
+  "[MSSQL] Date Range": {
+    "scope": "sql",
+    "prefix": "/mssql_daterange",
+    "body": [
+      "WHERE ${1:created_at} >= @${2:start_datetime}",
+      "  AND ${1:created_at} < @${3:end_datetime}"
+    ],
+    "description": "SQL Server date range condition"
+  },
+  "[MSSQL] Explain Actual Plan Hint": {
+    "scope": "sql",
+    "prefix": "/mssql_plan",
+    "body": [
+      "SET STATISTICS IO ON;",
+      "SET STATISTICS TIME ON;",
+      "",
+      "${1:SELECT * FROM dbo.table_name;}",
+      "",
+      "SET STATISTICS IO OFF;",
+      "SET STATISTICS TIME OFF;"
+    ],
+    "description": "SQL Server statistics for query investigation"
+  },
+  "[Oracle] FETCH FIRST": {
+    "scope": "sql",
+    "prefix": "/oracle_fetch",
+    "body": [
+      "SELECT",
+      "    ${1:*}",
+      "FROM",
+      "    ${2:table}",
+      "ORDER BY",
+      "    ${3:column}",
+      "FETCH FIRST ${4:100} ROWS ONLY;"
+    ],
+    "description": "Oracle FETCH FIRST"
+  },
+  "[Oracle] ROWNUM": {
+    "scope": "sql",
+    "prefix": "/oracle_rownum",
+    "body": [
+      "SELECT",
+      "    ${1:*}",
+      "FROM",
+      "    ${2:table}",
+      "WHERE",
+      "    ROWNUM <= ${3:100};"
+    ],
+    "description": "Oracle ROWNUM limit"
+  },
+  "[Oracle] Paging OFFSET FETCH": {
+    "scope": "sql",
+    "prefix": "/oracle_page",
+    "body": [
+      "SELECT",
+      "    ${1:*}",
+      "FROM",
+      "    ${2:table}",
+      "ORDER BY",
+      "    ${3:column}",
+      "OFFSET ${4:0} ROWS FETCH NEXT ${5:100} ROWS ONLY;"
+    ],
+    "description": "Oracle paging with OFFSET FETCH"
+  },
+  "[Oracle] Create Table": {
+    "scope": "sql",
+    "prefix": "/oracle_table",
+    "body": [
+      "CREATE TABLE ${1:table_name} (",
+      "    id NUMBER GENERATED BY DEFAULT AS IDENTITY NOT NULL,",
+      "    ${2:name} VARCHAR2(${3:100}) NOT NULL,",
+      "    created_at TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,",
+      "    CONSTRAINT pk_${1:table_name} PRIMARY KEY (id)",
+      ");"
+    ],
+    "description": "Oracle CREATE TABLE"
+  },
+  "[Oracle] Create Index": {
+    "scope": "sql",
+    "prefix": "/oracle_index",
+    "body": [
+      "CREATE INDEX ix_${1:table}_${2:column}",
+      "ON ${1:table} (${2:column});"
+    ],
+    "description": "Oracle CREATE INDEX"
+  },
+  "[Oracle] Create Unique Index": {
+    "scope": "sql",
+    "prefix": "/oracle_uindex",
+    "body": [
+      "CREATE UNIQUE INDEX ux_${1:table}_${2:column}",
+      "ON ${1:table} (${2:column});"
+    ],
+    "description": "Oracle CREATE UNIQUE INDEX"
+  },
+  "[Oracle] Sequence": {
+    "scope": "sql",
+    "prefix": "/oracle_seq",
+    "body": [
+      "CREATE SEQUENCE ${1:seq_name}",
+      "    START WITH ${2:1}",
+      "    INCREMENT BY ${3:1}",
+      "    NOCACHE",
+      "    NOCYCLE;"
+    ],
+    "description": "Oracle sequence"
+  },
+  "[Oracle] PL/SQL Block": {
+    "scope": "sql",
+    "prefix": "/oracle_block",
+    "body": [
+      "DECLARE",
+      "    ${1:v_name} ${2:VARCHAR2(100)};",
+      "BEGIN",
+      "    ${0}",
+      "EXCEPTION",
+      "    WHEN OTHERS THEN",
+      "        RAISE;",
+      "END;",
+      "/"
+    ],
+    "description": "Oracle PL/SQL block"
+  },
+  "[Oracle] Procedure": {
+    "scope": "sql",
+    "prefix": "/oracle_proc",
+    "body": [
+      "CREATE OR REPLACE PROCEDURE ${1:procedure_name} (",
+      "    p_${2:param} IN ${3:VARCHAR2}",
+      ") AS",
+      "BEGIN",
+      "    ${0}",
+      "END ${1:procedure_name};",
+      "/"
+    ],
+    "description": "Oracle stored procedure"
+  },
+  "[Oracle] Variable": {
+    "scope": "sql",
+    "prefix": "/oracle_var",
+    "body": [
+      "${1:v_name} ${2:VARCHAR2(100)} := ${3:value};"
+    ],
+    "description": "Oracle PL/SQL variable declaration"
+  },
+  "[Oracle] Upsert MERGE": {
+    "scope": "sql",
+    "prefix": "/oracle_merge",
+    "body": [
+      "MERGE INTO ${1:target_table} target",
+      "USING (",
+      "    SELECT",
+      "        ${2:id} AS ${2:id},",
+      "        ${3:value} AS ${3:value}",
+      "    FROM dual",
+      ") source",
+      "ON (target.${2:id} = source.${2:id})",
+      "WHEN MATCHED THEN",
+      "    UPDATE SET",
+      "        target.${3:value} = source.${3:value}",
+      "WHEN NOT MATCHED THEN",
+      "    INSERT (${2:id}, ${3:value})",
+      "    VALUES (source.${2:id}, source.${3:value});"
+    ],
+    "description": "Oracle MERGE upsert"
+  },
+  "[Oracle] Date Range": {
+    "scope": "sql",
+    "prefix": "/oracle_daterange",
+    "body": [
+      "WHERE ${1:created_at} >= :${2:start_datetime}",
+      "  AND ${1:created_at} < :${3:end_datetime}"
+    ],
+    "description": "Oracle date range condition"
+  },
+  "[Oracle] Explain Plan": {
+    "scope": "sql",
+    "prefix": "/oracle_plan",
+    "body": [
+      "EXPLAIN PLAN FOR",
+      "${1:SELECT * FROM table_name;}",
+      "",
+      "SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY);"
+    ],
+    "description": "Oracle EXPLAIN PLAN"
+  },
+  "[Oracle] NVL": {
+    "scope": "sql",
+    "prefix": "/oracle_nvl",
+    "body": [
+      "NVL(${1:value}, ${2:default_value})"
+    ],
+    "description": "Oracle NVL expression"
+  },
+  "[Oracle] SYSDATE Condition": {
+    "scope": "sql",
+    "prefix": "/oracle_sysdate",
+    "body": [
+      "WHERE ${1:date_column} >= SYSDATE - ${2:7}"
+    ],
+    "description": "Oracle SYSDATE condition"
+  }
+}

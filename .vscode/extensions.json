@@ -1,0 +1,33 @@
+{
+  "recommendations": [
+    // 基本
+    "ms-ceintl.vscode-language-pack-ja", // 日本語化
+    "moshfeu.compare-folders", // フォルダ比較拡張(プロジェクトの差分確認に便利)
+    "janisdd.vscode-edit-csv", // CSV 編集拡張(CSV ファイルを表形式で編集可能に)
+    "oderwat.indent-rainbow", // インデントレベルを色分けする拡張(コードの構造把握に便利)
+    "vscode-icons-team.vscode-icons", // アイコンテーマ拡張(ファイルアイコンを見やすくするため)
+
+    // SSH
+    "ms-vscode-remote.remote-ssh", // Remote SSH 拡張(リモート開発に便利)
+    "ms-vscode-remote.remote-ssh-edit", // Remote SSH Edit 拡張(リモートファイルの直接編集に便利)
+    "ms-vscode.remote-explorer", // Remote Explorer 拡張(リモート接続の管理に便利)
+
+    // 資料作成
+    "hediet.vscode-drawio", // Draw.io 拡張(ダイアグラム作成に便利)
+
+    // Markdown
+    "yzhang.markdown-all-in-one", // Markdown 拡張(Markdown 編集を便利にするため)
+    "bierner.markdown-emoji", // Markdown 絵文字拡張(Markdown で絵文字を使えるようにするため)
+    "bierner.markdown-footnotes", // Markdown フットノート拡張(Markdown で脚注を使えるようにするため)
+
+    // github.copilot-chat 拡張(AI チャットサポート)
+    "github.copilot-chat", // GitHub Copilot Chat 任意
+
+    // リンター/コード整形
+    "charliermarsh.ruff", // Ruff: コード整形&リンター(Python)
+    "esbenp.prettier-vscode", // Prettier：コード整形拡張(JavaScript/TypeScript/CSS/HTML/JSON/Markdown など)
+    "dbaeumer.vscode-eslint", // ESLint：コード品質向上のため(JavaScript/TypeScript など)
+    "biomejs.biome" // Biome：コード整形&リンター(JavaScript/TypeScript など)
+  ],
+  "unwantedRecommendations": []
+}

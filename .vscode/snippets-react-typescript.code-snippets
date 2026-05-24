@@ -1,0 +1,367 @@
+{
+  "[React TypeScript] Function Component": {
+    "scope": "typescriptreact",
+    "prefix": "/rfc",
+    "body": [
+      "type ${1:ComponentName}Props = {",
+      "  ${2}",
+      "};",
+      "",
+      "export function ${1:ComponentName}({ ${3} }: ${1:ComponentName}Props) {",
+      "  return (",
+      "    <${4:div}>",
+      "      ${0}",
+      "    </${4:div}>",
+      "  );",
+      "}"
+    ],
+    "description": "React TypeScript function component with props type"
+  },
+  "[React TypeScript] Arrow Function Component": {
+    "scope": "typescriptreact",
+    "prefix": "/rafc",
+    "body": [
+      "type ${1:ComponentName}Props = {",
+      "  ${2}",
+      "};",
+      "",
+      "export const ${1:ComponentName} = ({ ${3} }: ${1:ComponentName}Props) => {",
+      "  return (",
+      "    <${4:div}>",
+      "      ${0}",
+      "    </${4:div}>",
+      "  );",
+      "};"
+    ],
+    "description": "React TypeScript arrow function component"
+  },
+  "[React TypeScript] Page Component": {
+    "scope": "typescriptreact",
+    "prefix": "/page",
+    "body": [
+      "export default function ${1:Page}() {",
+      "  return (",
+      "    <main>",
+      "      <h1>${2:Title}</h1>",
+      "      ${0}",
+      "    </main>",
+      "  );",
+      "}"
+    ],
+    "description": "React page component"
+  },
+  "[React TypeScript] Props Type": {
+    "scope": "typescriptreact",
+    "prefix": "/props",
+    "body": [
+      "type ${1:ComponentName}Props = {",
+      "  ${2:children}?: React.ReactNode;",
+      "};"
+    ],
+    "description": "React props type"
+  },
+  "[React TypeScript] Children Props": {
+    "scope": "typescriptreact",
+    "prefix": "/children",
+    "body": [
+      "type ${1:ComponentName}Props = {",
+      "  children: React.ReactNode;",
+      "};"
+    ],
+    "description": "React children props type"
+  },
+  "[React TypeScript] Component With Children": {
+    "scope": "typescriptreact",
+    "prefix": "/rfcchildren",
+    "body": [
+      "type ${1:ComponentName}Props = {",
+      "  children: React.ReactNode;",
+      "};",
+      "",
+      "export function ${1:ComponentName}({ children }: ${1:ComponentName}Props) {",
+      "  return (",
+      "    <${2:div}>",
+      "      {children}",
+      "    </${2:div}>",
+      "  );",
+      "}"
+    ],
+    "description": "React component with children"
+  },
+  "[React TypeScript] useState": {
+    "scope": "typescriptreact",
+    "prefix": "/state",
+    "body": [
+      "const [${1:value}, set${2:Value}] = useState<${3:string}>(${4:\"\"});"
+    ],
+    "description": "React useState with explicit type"
+  },
+  "[React TypeScript] useEffect": {
+    "scope": "typescriptreact",
+    "prefix": "/effect",
+    "body": [
+      "useEffect(() => {",
+      "  ${1}",
+      "",
+      "  return () => {",
+      "    ${2}",
+      "  };",
+      "}, [${0}]);"
+    ],
+    "description": "React useEffect with cleanup"
+  },
+  "[React TypeScript] useMemo": {
+    "scope": "typescriptreact",
+    "prefix": "/memo",
+    "body": [
+      "const ${1:value} = useMemo(() => {",
+      "  ${0:return ${2:computedValue};}",
+      "}, [${3}]);"
+    ],
+    "description": "React useMemo"
+  },
+  "[React TypeScript] useCallback": {
+    "scope": "typescriptreact",
+    "prefix": "/callback",
+    "body": [
+      "const ${1:handleAction} = useCallback((${2}) => {",
+      "  ${0}",
+      "}, [${3}]);"
+    ],
+    "description": "React useCallback"
+  },
+  "[React TypeScript] useRef": {
+    "scope": "typescriptreact",
+    "prefix": "/ref",
+    "body": [
+      "const ${1:ref} = useRef<${2:HTMLDivElement} | null>(null);"
+    ],
+    "description": "React useRef with DOM element type"
+  },
+  "[React TypeScript] Change Handler": {
+    "scope": "typescriptreact",
+    "prefix": "/onchange",
+    "body": [
+      "const handle${1:Change} = (event: React.ChangeEvent<${2:HTMLInputElement}>) => {",
+      "  const { value } = event.currentTarget;",
+      "  ${0}",
+      "};"
+    ],
+    "description": "React change event handler"
+  },
+  "[React TypeScript] Click Handler": {
+    "scope": "typescriptreact",
+    "prefix": "/onclick",
+    "body": [
+      "const handle${1:Click} = (event: React.MouseEvent<${2:HTMLButtonElement}>) => {",
+      "  ${0}",
+      "};"
+    ],
+    "description": "React click event handler"
+  },
+  "[React TypeScript] Submit Handler": {
+    "scope": "typescriptreact",
+    "prefix": "/onsubmit",
+    "body": [
+      "const handle${1:Submit} = (event: React.FormEvent<${2:HTMLFormElement}>) => {",
+      "  event.preventDefault();",
+      "  ${0}",
+      "};"
+    ],
+    "description": "React form submit event handler"
+  },
+  "[React TypeScript] Conditional Render": {
+    "scope": "typescriptreact",
+    "prefix": "/ifrender",
+    "body": [
+      "if (${1:isLoading}) {",
+      "  return <${2:div}>${3:Loading...}</${2:div}>;",
+      "}"
+    ],
+    "description": "React conditional early return"
+  },
+  "[React TypeScript] Map Render": {
+    "scope": "typescriptreact",
+    "prefix": "/maprender",
+    "body": [
+      "{${1:items}.map((${2:item}) => (",
+      "  <${3:div} key={${2:item}.${4:id}}>",
+      "    ${0}",
+      "  </${3:div}>",
+      "))}"
+    ],
+    "description": "React list rendering with key"
+  },
+  "[React TypeScript] Fragment": {
+    "scope": "typescriptreact",
+    "prefix": "/frag",
+    "body": [
+      "<>",
+      "  ${0}",
+      "</>"
+    ],
+    "description": "React fragment"
+  },
+  "[React TypeScript] Context": {
+    "scope": "typescriptreact",
+    "prefix": "/context",
+    "body": [
+      "type ${1:ContextName}Value = {",
+      "  ${2}",
+      "};",
+      "",
+      "const ${1:ContextName}Context = createContext<${1:ContextName}Value | null>(null);",
+      "",
+      "export function use${1:ContextName}() {",
+      "  const context = useContext(${1:ContextName}Context);",
+      "",
+      "  if (context === null) {",
+      "    throw new Error(\"use${1:ContextName} must be used within ${1:ContextName}Provider\");",
+      "  }",
+      "",
+      "  return context;",
+      "}"
+    ],
+    "description": "React context and hook"
+  },
+  "[React TypeScript] Provider": {
+    "scope": "typescriptreact",
+    "prefix": "/provider",
+    "body": [
+      "type ${1:ProviderName}Props = {",
+      "  children: React.ReactNode;",
+      "};",
+      "",
+      "export function ${1:ProviderName}({ children }: ${1:ProviderName}Props) {",
+      "  const value = {",
+      "    ${2}",
+      "  };",
+      "",
+      "  return (",
+      "    <${3:Context}.Provider value={value}>",
+      "      {children}",
+      "    </${3:Context}.Provider>",
+      "  );",
+      "}"
+    ],
+    "description": "React provider component"
+  },
+  "[React TypeScript] Custom Hook": {
+    "scope": "typescriptreact",
+    "prefix": "/hook",
+    "body": [
+      "export function use${1:HookName}(${2}) {",
+      "  ${0}",
+      "}"
+    ],
+    "description": "React custom hook"
+  },
+  "[React TypeScript] Custom Hook With State": {
+    "scope": "typescriptreact",
+    "prefix": "/hookstate",
+    "body": [
+      "export function use${1:HookName}() {",
+      "  const [${2:value}, set${3:Value}] = useState<${4:string}>(${5:\"\"});",
+      "",
+      "  return {",
+      "    ${2:value},",
+      "    set${3:Value},",
+      "  };",
+      "}"
+    ],
+    "description": "React custom hook with state"
+  },
+  "[React TypeScript] React Memo": {
+    "scope": "typescriptreact",
+    "prefix": "/reactmemo",
+    "body": [
+      "export const ${1:ComponentName} = memo(function ${1:ComponentName}(${2:props}: ${3:Props}) {",
+      "  return (",
+      "    <${4:div}>",
+      "      ${0}",
+      "    </${4:div}>",
+      "  );",
+      "});"
+    ],
+    "description": "React memo component"
+  },
+  "[React TypeScript] Error Boundary Skeleton": {
+    "scope": "typescriptreact",
+    "prefix": "/errorboundary",
+    "body": [
+      "type ${1:ErrorBoundary}Props = {",
+      "  children: React.ReactNode;",
+      "};",
+      "",
+      "type ${1:ErrorBoundary}State = {",
+      "  hasError: boolean;",
+      "};",
+      "",
+      "export class ${1:ErrorBoundary} extends React.Component<${1:ErrorBoundary}Props, ${1:ErrorBoundary}State> {",
+      "  state: ${1:ErrorBoundary}State = { hasError: false };",
+      "",
+      "  static getDerivedStateFromError(): ${1:ErrorBoundary}State {",
+      "    return { hasError: true };",
+      "  }",
+      "",
+      "  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {",
+      "    console.error(error, errorInfo);",
+      "  }",
+      "",
+      "  render() {",
+      "    if (this.state.hasError) {",
+      "      return <${2:div}>${3:Something went wrong.}</${2:div}>;",
+      "    }",
+      "",
+      "    return this.props.children;",
+      "  }",
+      "}"
+    ],
+    "description": "React error boundary skeleton"
+  },
+  "[React TypeScript] Component Test": {
+    "scope": "typescriptreact",
+    "prefix": "/test",
+    "body": [
+      "import { render, screen } from \"@testing-library/react\";",
+      "import { describe, expect, it } from \"vitest\";",
+      "",
+      "import { ${1:ComponentName} } from \"./${1:ComponentName}\";",
+      "",
+      "describe(\"${1:ComponentName}\", () => {",
+      "  it(\"renders\", () => {",
+      "    render(<${1:ComponentName} />);",
+      "",
+      "    expect(screen.getByText(\"${2:text}\")).toBeInTheDocument();",
+      "  });",
+      "});"
+    ],
+    "description": "React component test with Testing Library and Vitest"
+  },
+  "[React TypeScript] Client Component Directive": {
+    "scope": "typescriptreact",
+    "prefix": "/client",
+    "body": [
+      "\"use client\";"
+    ],
+    "description": "Next.js client component directive"
+  },
+  "[React TypeScript] Class Name Prop": {
+    "scope": "typescriptreact",
+    "prefix": "/classname",
+    "body": [
+      "className?: string;"
+    ],
+    "description": "Optional className prop"
+  },
+  "[React TypeScript] Button Props": {
+    "scope": "typescriptreact",
+    "prefix": "/buttonprops",
+    "body": [
+      "type ${1:Button}Props = React.ComponentPropsWithoutRef<\"button\"> & {",
+      "  ${2}",
+      "};"
+    ],
+    "description": "Button props based on native button attributes"
+  }
+}

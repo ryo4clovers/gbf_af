@@ -1,0 +1,317 @@
+{
+  "[Vue] SFC Script Setup": {
+    "scope": "vue",
+    "prefix": "/vue3",
+    "body": [
+      "<script setup lang=\"ts\">",
+      "${1}",
+      "</script>",
+      "",
+      "<template>",
+      "  <${2:div}>",
+      "    ${0}",
+      "  </${2:div}>",
+      "</template>",
+      "",
+      "<style scoped>",
+      "</style>"
+    ],
+    "description": "Vue 3 SFC with script setup and TypeScript"
+  },
+  "[Vue] SFC Script Setup Minimal": {
+    "scope": "vue",
+    "prefix": "/sfc",
+    "body": [
+      "<script setup lang=\"ts\">",
+      "${1}",
+      "</script>",
+      "",
+      "<template>",
+      "  ${0}",
+      "</template>"
+    ],
+    "description": "Minimal Vue 3 SFC with script setup"
+  },
+  "[Vue] Define Props Type": {
+    "scope": "vue",
+    "prefix": "/props",
+    "body": [
+      "type Props = {",
+      "  ${1:name}: ${2:string};",
+      "};",
+      "",
+      "const props = defineProps<Props>();"
+    ],
+    "description": "Vue defineProps with TypeScript type"
+  },
+  "[Vue] Define Props With Defaults": {
+    "scope": "vue",
+    "prefix": "/propsdefault",
+    "body": [
+      "type Props = {",
+      "  ${1:name}?: ${2:string};",
+      "};",
+      "",
+      "const props = withDefaults(defineProps<Props>(), {",
+      "  ${1:name}: ${3:\"\"},",
+      "});"
+    ],
+    "description": "Vue defineProps with defaults"
+  },
+  "[Vue] Define Emits": {
+    "scope": "vue",
+    "prefix": "/emit",
+    "body": [
+      "const emit = defineEmits<{",
+      "  ${1:change}: [${2:value}: ${3:string}];",
+      "}>();"
+    ],
+    "description": "Vue defineEmits with named tuple payload"
+  },
+  "[Vue] Define Model": {
+    "scope": "vue",
+    "prefix": "/model",
+    "body": [
+      "const ${1:modelValue} = defineModel<${2:string}>({",
+      "  required: ${3:true},",
+      "});"
+    ],
+    "description": "Vue defineModel"
+  },
+  "[Vue] Ref": {
+    "scope": "vue",
+    "prefix": "/ref",
+    "body": [
+      "const ${1:value} = ref<${2:string}>(${3:\"\"});"
+    ],
+    "description": "Vue ref with explicit type"
+  },
+  "[Vue] Reactive": {
+    "scope": "vue",
+    "prefix": "/reactive",
+    "body": [
+      "const ${1:state} = reactive<{",
+      "  ${2:name}: ${3:string};",
+      "}>({",
+      "  ${2:name}: ${4:\"\"},",
+      "});"
+    ],
+    "description": "Vue reactive state with explicit type"
+  },
+  "[Vue] Computed": {
+    "scope": "vue",
+    "prefix": "/computed",
+    "body": [
+      "const ${1:computedValue} = computed(() => {",
+      "  ${0:return ${2:value};}",
+      "});"
+    ],
+    "description": "Vue computed"
+  },
+  "[Vue] Writable Computed": {
+    "scope": "vue",
+    "prefix": "/wcomputed",
+    "body": [
+      "const ${1:value} = computed({",
+      "  get: () => ${2:source.value},",
+      "  set: (${3:newValue}: ${4:string}) => {",
+      "    ${0}",
+      "  },",
+      "});"
+    ],
+    "description": "Vue writable computed"
+  },
+  "[Vue] Watch": {
+    "scope": "vue",
+    "prefix": "/watch",
+    "body": [
+      "watch(${1:source}, (${2:newValue}, ${3:oldValue}) => {",
+      "  ${0}",
+      "});"
+    ],
+    "description": "Vue watch"
+  },
+  "[Vue] Watch Effect": {
+    "scope": "vue",
+    "prefix": "/watcheffect",
+    "body": [
+      "watchEffect(() => {",
+      "  ${0}",
+      "});"
+    ],
+    "description": "Vue watchEffect"
+  },
+  "[Vue] Lifecycle Mounted": {
+    "scope": "vue",
+    "prefix": "/mounted",
+    "body": [
+      "onMounted(() => {",
+      "  ${0}",
+      "});"
+    ],
+    "description": "Vue onMounted"
+  },
+  "[Vue] Lifecycle Unmounted": {
+    "scope": "vue",
+    "prefix": "/unmounted",
+    "body": [
+      "onUnmounted(() => {",
+      "  ${0}",
+      "});"
+    ],
+    "description": "Vue onUnmounted"
+  },
+  "[Vue] Template If": {
+    "scope": "vue",
+    "prefix": "/vif",
+    "body": [
+      "<${1:div} v-if=\"${2:condition}\">",
+      "  ${0}",
+      "</${1:div}>"
+    ],
+    "description": "Vue v-if template block"
+  },
+  "[Vue] Template For": {
+    "scope": "vue",
+    "prefix": "/vfor",
+    "body": [
+      "<${1:div}",
+      "  v-for=\"${2:item} in ${3:items}\"",
+      "  :key=\"${2:item}.${4:id}\"",
+      ">",
+      "  ${0}",
+      "</${1:div}>"
+    ],
+    "description": "Vue v-for template block"
+  },
+  "[Vue] Template Slot": {
+    "scope": "vue",
+    "prefix": "/slot",
+    "body": [
+      "<slot name=\"${1:default}\">",
+      "  ${0}",
+      "</slot>"
+    ],
+    "description": "Vue named slot"
+  },
+  "[Vue] Template Named Slot Usage": {
+    "scope": "vue",
+    "prefix": "/slotuse",
+    "body": [
+      "<template #${1:default}=\"${2:slotProps}\">",
+      "  ${0}",
+      "</template>"
+    ],
+    "description": "Vue named slot usage"
+  },
+  "[Vue] Event Handler": {
+    "scope": "vue",
+    "prefix": "/handler",
+    "body": [
+      "function handle${1:Click}(${2:event}: ${3:Event}) {",
+      "  ${0}",
+      "}"
+    ],
+    "description": "Vue event handler function"
+  },
+  "[Vue] Async Action": {
+    "scope": "vue",
+    "prefix": "/async",
+    "body": [
+      "async function ${1:loadData}(): Promise<void> {",
+      "  try {",
+      "    ${2}",
+      "  } catch (error) {",
+      "    console.error(error);",
+      "  }",
+      "}"
+    ],
+    "description": "Vue async function with try-catch"
+  },
+  "[Vue] Component Import": {
+    "scope": "vue",
+    "prefix": "/importcomp",
+    "body": [
+      "import ${1:ComponentName} from \"${2:./ComponentName.vue}\";"
+    ],
+    "description": "Vue component import"
+  },
+  "[Vue] CSS Module Style": {
+    "scope": "vue",
+    "prefix": "/stylemodule",
+    "body": [
+      "<style module>",
+      ".${1:className} {",
+      "  ${0}",
+      "}",
+      "</style>"
+    ],
+    "description": "Vue CSS module style block"
+  },
+  "[Vue] Scoped Style": {
+    "scope": "vue",
+    "prefix": "/stylescoped",
+    "body": [
+      "<style scoped>",
+      ".${1:className} {",
+      "  ${0}",
+      "}",
+      "</style>"
+    ],
+    "description": "Vue scoped style block"
+  },
+  "[Vue] Pinia Store": {
+    "scope": "vue,typescript",
+    "prefix": "/pinia",
+    "body": [
+      "import { defineStore } from \"pinia\";",
+      "",
+      "export const use${1:StoreName}Store = defineStore(\"${2:storeName}\", () => {",
+      "  const ${3:value} = ref<${4:string}>(${5:\"\"});",
+      "",
+      "  function set${6:Value}(nextValue: ${4:string}) {",
+      "    ${3:value}.value = nextValue;",
+      "  }",
+      "",
+      "  return {",
+      "    ${3:value},",
+      "    set${6:Value},",
+      "  };",
+      "});"
+    ],
+    "description": "Pinia setup store"
+  },
+  "[Vue] Composable": {
+    "scope": "vue,typescript",
+    "prefix": "/composable",
+    "body": [
+      "export function use${1:ComposableName}() {",
+      "  const ${2:value} = ref<${3:string}>(${4:\"\"});",
+      "",
+      "  return {",
+      "    ${2:value},",
+      "  };",
+      "}"
+    ],
+    "description": "Vue composable"
+  },
+  "[Vue] Component Test": {
+    "scope": "typescript",
+    "prefix": "/vuetest",
+    "body": [
+      "import { mount } from \"@vue/test-utils\";",
+      "import { describe, expect, it } from \"vitest\";",
+      "",
+      "import ${1:ComponentName} from \"./${1:ComponentName}.vue\";",
+      "",
+      "describe(\"${1:ComponentName}\", () => {",
+      "  it(\"renders\", () => {",
+      "    const wrapper = mount(${1:ComponentName});",
+      "",
+      "    expect(wrapper.exists()).toBe(true);",
+      "  });",
+      "});"
+    ],
+    "description": "Vue component test with Vue Test Utils and Vitest"
+  }
+}
