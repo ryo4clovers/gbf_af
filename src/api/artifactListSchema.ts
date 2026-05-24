@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+z.config({ jitless: true });
+
 const rawScoreInfoSchema = z.object({
   attack_score: z.number(),
   defense_score: z.number(),
