@@ -24,6 +24,12 @@ button:hover {
   background: #eef2f6;
 }
 
+button:disabled {
+  color: #7b8794;
+  background: #eef2f6;
+  cursor: default;
+}
+
 .popup {
   width: 320px;
   padding: 16px;
@@ -83,4 +89,16 @@ button:hover {
 .status {
   min-height: 18px;
   margin-top: 12px;
+}
+
+.status.success {
+  color: #1f7a4d;
+}
+
+.status.error {
+  color: #b42318;
+}
+
+.status.scanning {
+  color: #335c99;
 }

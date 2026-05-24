@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { sendRuntimeMessage } from "../shared/chromeMessages";
-import type { ExtensionResponse } from "../shared/messages";
-import { type AppMode, useAppStore } from "../state/appState";
+import type { ErrorResponse, ExtensionResponse } from "../shared/messages";
+import { type AppMode, type ScanStatus, useAppStore } from "../state/appState";
 import "./style.css";
 
 function Popup() {
   const { mode, scan, setMode, setScanState } = useAppStore();
   const [statusMessage, setStatusMessage] = useState("Ready.");
+  const isScanning = scan.status === "scanning";
 
   useEffect(() => {
     sendRuntimeMessage({ type: "GET_APP_STATE" }).then((response) => {
@@ -27,6 +28,14 @@ function Popup() {
   };
 
   const scanCurrentPage = async () => {
+    setScanState({
+      ...scan,
+      status: "scanning",
+      errorCode: null,
+      errorMessage: null,
+    });
+    setStatusMessage("Scanning current artifact page...");
+
     const response = await sendRuntimeMessage({ type: "SCAN_CURRENT_PAGE" });
     handleResponse(response);
   };
@@ -38,7 +47,10 @@ function Popup() {
 
   const handleResponse = (response: ExtensionResponse) => {
     if (!response.ok) {
-      setStatusMessage(response.message);
+      if (response.scan !== undefined) {
+        setScanState(response.scan);
+      }
+      setStatusMessage(getPopupErrorMessage(response));
       return;
     }
 
@@ -88,31 +100,71 @@ function Popup() {
 
       <section aria-label="Scan summary" className="summary">
         <div>
-          <span>Current page</span>
-          <strong>{scan.currentPage ?? "-"}</strong>
+          <span>Status</span>
+          <strong>{formatScanStatus(scan.status)}</strong>
+        </div>
+        <div>
+          <span>Scanned page</span>
+          <strong>{scan.lastScannedPage ?? "-"}</strong>
+        </div>
+        <div>
+          <span>Current count</span>
+          <strong>{scan.lastScanArtifactCount}</strong>
         </div>
         <div>
           <span>Scanned pages</span>
           <strong>{scan.scannedPages.length}</strong>
         </div>
         <div>
-          <span>Artifacts scanned</span>
+          <span>Stored artifacts</span>
           <strong>{scan.scannedArtifactCount}</strong>
         </div>
       </section>
 
       <section className="actions" aria-label="Actions">
-        <button type="button" onClick={scanCurrentPage}>
-          Scan Current Page
+        <button type="button" onClick={scanCurrentPage} disabled={isScanning}>
+          {isScanning ? "Scanning..." : "Scan Current Page"}
         </button>
         <button type="button" onClick={openDashboard}>
           Open Dashboard
         </button>
       </section>
 
-      <p className="status">{statusMessage}</p>
+      <p className={`status ${scan.status}`}>{statusMessage}</p>
     </main>
   );
+}
+
+function getPopupErrorMessage(response: ErrorResponse): string {
+  switch (response.errorCode) {
+    case "not_on_artifact_page":
+      return "Open a GBF artifact page before scanning.";
+    case "page_number_not_detected":
+      return "Could not detect the current artifact page number.";
+    case "api_validation_failed":
+      return "Artifact API response format was not recognized.";
+    case "request_failed":
+      return "Artifact list request failed. Check the GBF page and network state.";
+    case "active_tab_unavailable":
+      return "Active tab could not be identified.";
+    case "unexpected_response":
+      return "Unexpected extension response.";
+    default:
+      return response.message;
+  }
+}
+
+function formatScanStatus(status: ScanStatus) {
+  switch (status) {
+    case "idle":
+      return "Idle";
+    case "scanning":
+      return "Scanning";
+    case "success":
+      return "Success";
+    case "error":
+      return "Error";
+  }
 }
 
 const rootElement = document.getElementById("root");

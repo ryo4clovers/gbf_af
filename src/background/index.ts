@@ -1,12 +1,18 @@
 import { ZodError } from "zod";
+import type { ArtifactListResponse } from "../api/artifactListTypes";
 import { fetchArtifactListPage } from "../api/fetchArtifactList";
 import { normalizeArtifact } from "../domain/normalizeArtifact";
-import type { ExtensionMessage, ExtensionResponse } from "../shared/messages";
-import { type AppMode, initialScanState } from "../state/appState";
+import type {
+  ErrorResponse,
+  ExtensionMessage,
+  ExtensionResponse,
+} from "../shared/messages";
 import {
-  getStoredArtifactCount,
-  saveArtifactsInMemory,
-} from "./artifactMemoryStorage";
+  type AppMode,
+  initialScanState,
+  type ScanErrorCode,
+} from "../state/appState";
+import { saveSuccessfulScanInMemory } from "./artifactMemoryStorage";
 
 let currentMode: AppMode = "scan";
 let currentScanState = initialScanState;
@@ -20,11 +26,17 @@ chrome.runtime.onMessage.addListener(
     handleMessage(message)
       .then(sendResponse)
       .catch((error: unknown) => {
-        console.error("Unhandled extension message error", error);
+        logDebugError("Unhandled extension message error", error);
+        currentScanState = markScanError(
+          "unexpected_response",
+          "Unexpected extension error.",
+        );
         sendResponse({
           ok: false,
           type: "ERROR",
           message: "Unexpected extension error.",
+          errorCode: "unexpected_response",
+          scan: currentScanState,
         });
       });
 
@@ -66,19 +78,26 @@ async function handleMessage(
         ok: false,
         type: "ERROR",
         message: "Unsupported message type.",
+        errorCode: "unexpected_response",
       };
   }
 }
 
 async function scanCurrentPage(): Promise<ExtensionResponse> {
+  currentScanState = {
+    ...currentScanState,
+    status: "scanning",
+    errorCode: null,
+    errorMessage: null,
+  };
+
   const tab = await getActiveTab();
 
-  if (tab.id === undefined) {
-    return {
-      ok: false,
-      type: "ERROR",
-      message: "Active tab could not be identified.",
-    };
+  if (tab?.id === undefined) {
+    return scanErrorResponse(
+      "active_tab_unavailable",
+      "Active tab could not be identified.",
+    );
   }
 
   const pageInfo = await getPageInfo(tab.id);
@@ -88,27 +107,24 @@ async function scanCurrentPage(): Promise<ExtensionResponse> {
   }
 
   if (pageInfo.type !== "PAGE_INFO") {
-    return {
-      ok: false,
-      type: "ERROR",
-      message: "Unexpected page info response.",
-    };
+    return scanErrorResponse(
+      "unexpected_response",
+      "Unexpected page info response.",
+    );
   }
 
   if (!pageInfo.isGranblueFantasyPage || !pageInfo.isArtifactPage) {
-    return {
-      ok: false,
-      type: "ERROR",
-      message: "Open a GBF artifact page before scanning.",
-    };
+    return scanErrorResponse(
+      "not_on_artifact_page",
+      "Open a GBF artifact page before scanning.",
+    );
   }
 
   if (pageInfo.artifactPage === null) {
-    return {
-      ok: false,
-      type: "ERROR",
-      message: "Could not detect the current artifact page number.",
-    };
+    return scanErrorResponse(
+      "page_number_not_detected",
+      "Could not detect the current artifact page number.",
+    );
   }
 
   const scannedAt = new Date().toISOString();
@@ -124,25 +140,35 @@ async function scanCurrentPage(): Promise<ExtensionResponse> {
   const artifacts = artifactList.list.map((raw) =>
     normalizeArtifact(raw, scannedAt),
   );
-  const storedArtifactCount = saveArtifactsInMemory(artifacts);
+  const storedArtifactCount = saveSuccessfulScanInMemory(
+    artifacts,
+    artifactList.current,
+    scannedAt,
+  );
 
   currentScanState = {
+    status: "success",
     currentPage: artifactList.current,
     lastPage: artifactList.last,
     totalCount: artifactList.count,
     scannedArtifactCount: storedArtifactCount,
+    lastScannedPage: artifactList.current,
+    lastScanArtifactCount: artifacts.length,
     scannedPages: addScannedPage(
       currentScanState.scannedPages,
       artifactList.current,
     ),
     lastScannedAt: scannedAt,
+    errorCode: null,
+    errorMessage: null,
   };
 
   return {
     ok: true,
     type: "SCAN_CURRENT_PAGE_RESULT",
     message: `Scanned ${artifacts.length} artifacts from page ${artifactList.current}.`,
-    artifactCount: getStoredArtifactCount(),
+    artifactCount: artifacts.length,
+    page: artifactList.current,
     scan: currentScanState,
   };
 }
@@ -156,51 +182,51 @@ async function getPageInfo(tabId: number): Promise<ExtensionResponse> {
       },
     );
   } catch (error) {
-    console.error("Could not read current page info", error);
-    return {
-      ok: false,
-      type: "ERROR",
-      message: "Could not read the active tab. Reload the GBF page and retry.",
-    };
+    logDebugError("Could not read current page info", error);
+    return scanErrorResponse(
+      "not_on_artifact_page",
+      "Open a GBF artifact page before scanning.",
+    );
   }
 }
 
-async function fetchCurrentArtifactList(page: number) {
+async function fetchCurrentArtifactList(page: number): Promise<
+  | {
+      ok: true;
+      artifactList: ArtifactListResponse;
+    }
+  | ErrorResponse
+> {
   try {
     return {
       ok: true as const,
       artifactList: await fetchArtifactListPage(page),
     };
   } catch (error) {
-    console.error("Artifact list fetch failed", error);
-
     if (error instanceof ZodError) {
-      return {
-        ok: false as const,
-        type: "ERROR" as const,
-        message: "Artifact list response did not match the expected shape.",
-      };
+      logZodError("Artifact list response validation failed", error);
+      return scanErrorResponse(
+        "api_validation_failed",
+        "Artifact list response did not match the expected shape.",
+      );
     }
 
-    return {
-      ok: false as const,
-      type: "ERROR" as const,
-      message:
-        error instanceof Error
-          ? error.message
-          : "Artifact list request failed.",
-    };
+    logDebugError("Artifact list request failed", error, { page });
+    return scanErrorResponse(
+      "request_failed",
+      "Artifact list request failed. Check the GBF page and network state.",
+    );
   }
 }
 
-async function getActiveTab(): Promise<chrome.tabs.Tab> {
+async function getActiveTab(): Promise<chrome.tabs.Tab | null> {
   const [tab] = await chrome.tabs.query({
     active: true,
     currentWindow: true,
   });
 
   if (tab === undefined) {
-    throw new Error("No active tab found.");
+    return null;
   }
 
   return tab;
@@ -209,5 +235,64 @@ async function getActiveTab(): Promise<chrome.tabs.Tab> {
 function addScannedPage(scannedPages: number[], page: number): number[] {
   return Array.from(new Set([...scannedPages, page])).sort((left, right) => {
     return left - right;
+  });
+}
+
+function scanErrorResponse(
+  errorCode: ScanErrorCode,
+  message: string,
+): ErrorResponse {
+  currentScanState = markScanError(errorCode, message);
+
+  return {
+    ok: false,
+    type: "ERROR",
+    message,
+    errorCode,
+    scan: currentScanState,
+  };
+}
+
+function markScanError(
+  errorCode: ScanErrorCode,
+  message: string,
+): typeof currentScanState {
+  return {
+    ...currentScanState,
+    status: "error",
+    errorCode,
+    errorMessage: message,
+  };
+}
+
+function logDebugError(
+  context: string,
+  error: unknown,
+  details: Record<string, unknown> = {},
+) {
+  const safeError =
+    error instanceof Error
+      ? {
+          name: error.name,
+          message: error.message,
+        }
+      : {
+          message: String(error),
+        };
+
+  console.error("[GBF Artifact Manager]", context, {
+    ...details,
+    error: safeError,
+  });
+}
+
+function logZodError(context: string, error: ZodError) {
+  console.error("[GBF Artifact Manager]", context, {
+    issueCount: error.issues.length,
+    issues: error.issues.map((issue) => ({
+      code: issue.code,
+      path: issue.path.join("."),
+      message: issue.message,
+    })),
   });
 }

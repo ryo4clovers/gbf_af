@@ -1,4 +1,4 @@
-import type { AppMode, ScanState } from "../state/appState";
+import type { AppMode, ScanErrorCode, ScanState } from "../state/appState";
 
 export type ExtensionMessage =
   | GetAppStateMessage
@@ -56,6 +56,7 @@ export type ScanCurrentPageResponse = {
   type: "SCAN_CURRENT_PAGE_RESULT";
   message: string;
   artifactCount: number;
+  page: number;
   scan: ScanState;
 };
 
@@ -68,4 +69,6 @@ export type ErrorResponse = {
   ok: false;
   type: "ERROR";
   message: string;
+  errorCode?: ScanErrorCode;
+  scan?: ScanState;
 };
