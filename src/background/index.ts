@@ -83,6 +83,15 @@ chrome.runtime.onMessage.addListener(
   },
 );
 
+chrome.action.onClicked.addListener((tab) => {
+  openSidePanelForTab(tab).catch((error: unknown) => {
+    logDebugError("Could not open side panel", error, {
+      tabId: tab.id,
+      url: tab.url,
+    });
+  });
+});
+
 async function handleMessage(
   message: ExtensionMessage,
 ): Promise<ExtensionResponse> {
@@ -153,6 +162,16 @@ async function handleMessage(
         errorCode: "unexpected_response",
       };
   }
+}
+
+async function openSidePanelForTab(tab: chrome.tabs.Tab): Promise<void> {
+  if (tab.id === undefined) {
+    throw new Error("Active tab id is unavailable.");
+  }
+
+  await chrome.sidePanel.open({
+    tabId: tab.id,
+  });
 }
 
 async function startObserving(): Promise<ExtensionResponse> {
@@ -524,7 +543,7 @@ async function handleObservedArtifactList(
       scan: currentScanState,
     } satisfies ExtensionMessage)
     .catch(() => {
-      // Popup may be closed; no action needed.
+      // Side panel may be closed; no action needed.
     });
 
   return {
@@ -573,7 +592,7 @@ async function updateDisplayFromObservedArtifactList(
         display: currentDisplayState,
       } satisfies ExtensionMessage)
       .catch(() => {
-        // Popup may be closed; no action needed.
+        // Side panel may be closed; no action needed.
       });
 
     console.info("[GBF Artifact Manager] display capture update", {

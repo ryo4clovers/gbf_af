@@ -1,0 +1,194 @@
+body {
+  margin: 0;
+  color: #1f2933;
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  background: #f7f8fa;
+}
+
+button {
+  border: 1px solid #c7ced8;
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: #1f2933;
+  font: inherit;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #eef2f6;
+}
+
+button:disabled {
+  color: #7b8794;
+  background: #eef2f6;
+  cursor: default;
+}
+
+.extensionPanel {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 16px;
+}
+
+.extensionPanel h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.extensionPanel p {
+  margin: 4px 0 0;
+  color: #52616f;
+  font-size: 13px;
+}
+
+.modeButtons,
+.actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.modeButtons {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.actions {
+  grid-template-columns: 1fr 1fr;
+}
+
+.modeButtons .active {
+  border-color: #3366cc;
+  color: #ffffff;
+  background: #3366cc;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.summary div {
+  border: 1px solid #d8dee8;
+  border-radius: 6px;
+  padding: 10px;
+  background: #ffffff;
+}
+
+.summary span {
+  display: block;
+  color: #697586;
+  font-size: 12px;
+}
+
+.summary strong {
+  display: block;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+  font-size: 16px;
+}
+
+.status {
+  min-height: 18px;
+  margin-top: 12px;
+}
+
+.status.success {
+  color: #1f7a4d;
+}
+
+.status.error {
+  color: #b42318;
+}
+
+.status.scanning {
+  color: #335c99;
+}
+
+.status.observing {
+  color: #335c99;
+}
+
+.status.captured {
+  color: #1f7a4d;
+}
+
+.displaySection {
+  margin-top: 16px;
+}
+
+.emptyDisplay {
+  margin-top: 16px;
+}
+
+.displayGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 110px);
+  gap: 8px;
+  margin-top: 16px;
+  overflow-x: auto;
+}
+
+.displayCard {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  width: 110px;
+  height: 110px;
+  border: 1px solid #d8dee8;
+  border-radius: 6px;
+  padding: 8px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.displayCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.ownedId,
+.rating {
+  color: #697586;
+  font-size: 11px;
+}
+
+.displayCard strong {
+  display: -webkit-box;
+  margin-top: 6px;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.25;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.rating {
+  margin-top: 6px;
+}
+
+.rating.unrated {
+  color: #9a6b20;
+}
+
+.warningMarker {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  color: #8a3b12;
+  font-size: 11px;
+  font-weight: 700;
+  background: #fff1d6;
+}
