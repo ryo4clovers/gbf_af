@@ -2,13 +2,18 @@ import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { sendRuntimeMessage } from "../shared/chromeMessages";
 import type { ErrorResponse, ExtensionResponse } from "../shared/messages";
-import { type AppMode, type ScanStatus, useAppStore } from "../state/appState";
+import {
+  type AppMode,
+  type ScanState,
+  type ScanStatus,
+  useAppStore,
+} from "../state/appState";
 import "./style.css";
 
 function Popup() {
   const { mode, scan, setMode, setScanState } = useAppStore();
   const [statusMessage, setStatusMessage] = useState("Ready.");
-  const isScanning = scan.status === "scanning";
+  const isObserving = scan.status === "observing";
 
   useEffect(() => {
     sendRuntimeMessage({ type: "GET_APP_STATE" }).then((response) => {
@@ -17,6 +22,25 @@ function Popup() {
         setScanState(response.scan);
       }
     });
+
+    const handleRuntimeMessage = (message: unknown) => {
+      if (
+        typeof message === "object" &&
+        message !== null &&
+        "type" in message &&
+        message.type === "OBSERVATION_CAPTURED_UPDATE" &&
+        "scan" in message
+      ) {
+        setScanState(message.scan as ScanState);
+        setStatusMessage("Captured artifact list response.");
+      }
+    };
+
+    chrome.runtime.onMessage.addListener(handleRuntimeMessage);
+
+    return () => {
+      chrome.runtime.onMessage.removeListener(handleRuntimeMessage);
+    };
   }, [setMode, setScanState]);
 
   const changeMode = async (nextMode: AppMode) => {
@@ -27,16 +51,21 @@ function Popup() {
     handleResponse(response);
   };
 
-  const scanCurrentPage = async () => {
+  const startObserving = async () => {
     setScanState({
       ...scan,
-      status: "scanning",
+      status: "observing",
       errorCode: null,
       errorMessage: null,
     });
-    setStatusMessage("Scanning current artifact page...");
+    setStatusMessage("Observing artifact list responses...");
 
-    const response = await sendRuntimeMessage({ type: "SCAN_CURRENT_PAGE" });
+    const response = await sendRuntimeMessage({ type: "START_OBSERVING" });
+    handleResponse(response);
+  };
+
+  const stopObserving = async () => {
+    const response = await sendRuntimeMessage({ type: "STOP_OBSERVING" });
     handleResponse(response);
   };
 
@@ -68,7 +97,13 @@ function Popup() {
       return;
     }
 
-    if (response.type === "SCAN_CURRENT_PAGE_RESULT") {
+    if (response.type === "OBSERVATION_STATUS") {
+      setScanState(response.scan);
+      setStatusMessage(response.message);
+      return;
+    }
+
+    if (response.type === "ARTIFACT_LIST_OBSERVED_RESULT") {
       setScanState(response.scan);
       setStatusMessage(response.message);
       return;
@@ -141,13 +176,16 @@ function Popup() {
       </section>
 
       <section className="actions" aria-label="Actions">
-        <button type="button" onClick={scanCurrentPage} disabled={isScanning}>
-          {isScanning ? "Scanning..." : "Scan Current Page"}
+        <button type="button" onClick={startObserving} disabled={isObserving}>
+          Start Observing
+        </button>
+        <button type="button" onClick={stopObserving} disabled={!isObserving}>
+          Stop Observing
         </button>
         <button type="button" onClick={openDashboard}>
           Open Dashboard
         </button>
-        <button type="button" onClick={clearStoredData} disabled={isScanning}>
+        <button type="button" onClick={clearStoredData} disabled={isObserving}>
           Clear Stored Data
         </button>
       </section>
@@ -166,7 +204,7 @@ function getPopupErrorMessage(response: ErrorResponse): string {
     case "api_validation_failed":
       return "Artifact API response format was not recognized.";
     case "request_failed":
-      return "Artifact list request failed. Check the GBF page and network state.";
+      return "Artifact list response capture failed.";
     case "storage_failed":
       return "Stored artifact data could not be updated.";
     case "active_tab_unavailable":
@@ -184,6 +222,10 @@ function formatScanStatus(status: ScanStatus) {
       return "Idle";
     case "scanning":
       return "Scanning";
+    case "observing":
+      return "Observing";
+    case "captured":
+      return "Captured";
     case "success":
       return "Success";
     case "error":

@@ -102,3 +102,11 @@ button:disabled {
 .status.scanning {
   color: #335c99;
 }
+
+.status.observing {
+  color: #335c99;
+}
+
+.status.captured {
+  color: #1f7a4d;
+}

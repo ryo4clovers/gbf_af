@@ -1,6 +1,6 @@
 import { ZodError } from "zod";
+import { artifactListResponseSchema } from "../api/artifactListSchema";
 import type { ArtifactListResponse } from "../api/artifactListTypes";
-import { fetchArtifactListPage } from "../api/fetchArtifactList";
 import type { Artifact } from "../domain/artifact";
 import { normalizeArtifact } from "../domain/normalizeArtifact";
 import type {
@@ -74,8 +74,12 @@ async function handleMessage(
         mode: currentMode,
         scan: currentScanState,
       };
-    case "SCAN_CURRENT_PAGE":
-      return scanCurrentPage();
+    case "START_OBSERVING":
+      return startObserving();
+    case "STOP_OBSERVING":
+      return stopObserving();
+    case "ARTIFACT_LIST_OBSERVED":
+      return handleObservedArtifactList(message);
     case "GET_STORED_ARTIFACT_COUNT":
       return getStoredArtifactCountResponse();
     case "GET_STORED_ARTIFACTS":
@@ -100,14 +104,7 @@ async function handleMessage(
   }
 }
 
-async function scanCurrentPage(): Promise<ExtensionResponse> {
-  currentScanState = {
-    ...currentScanState,
-    status: "scanning",
-    errorCode: null,
-    errorMessage: null,
-  };
-
+async function startObserving(): Promise<ExtensionResponse> {
   const tab = await getActiveTab();
 
   if (tab?.id === undefined) {
@@ -117,37 +114,87 @@ async function scanCurrentPage(): Promise<ExtensionResponse> {
     );
   }
 
-  const pageInfo = await getPageInfo(tab.id);
-
-  if (!pageInfo.ok) {
-    return pageInfo;
-  }
-
-  if (pageInfo.type !== "PAGE_INFO") {
-    return scanErrorResponse(
-      "unexpected_response",
-      "Unexpected page info response.",
-    );
-  }
-
-  if (!pageInfo.isGranblueFantasyPage || !pageInfo.isArtifactPage) {
+  if (!isGranblueFantasyTab(tab)) {
     return scanErrorResponse(
       "not_on_artifact_page",
-      "Open a GBF artifact page before scanning.",
+      "Open a GBF page before starting observation.",
     );
   }
 
-  if (pageInfo.artifactPage === null) {
+  try {
+    await injectPageObserver(tab.id);
+    await chrome.tabs.sendMessage<ExtensionMessage, ExtensionResponse>(tab.id, {
+      type: "START_OBSERVING",
+    });
+  } catch (error) {
+    logDebugError("Could not start observer", error, { tabId: tab.id });
     return scanErrorResponse(
-      "page_number_not_detected",
-      "Could not detect the current artifact page number.",
+      "unexpected_response",
+      "Could not start artifact response observation.",
     );
   }
+
+  currentScanState = {
+    ...currentScanState,
+    status: "observing",
+    errorCode: null,
+    errorMessage: null,
+  };
+  console.info("[GBF Artifact Manager] observer start", { tabId: tab.id });
+
+  return {
+    ok: true,
+    type: "OBSERVATION_STATUS",
+    message: "Observing GBF artifact list responses.",
+    observing: true,
+    scan: currentScanState,
+  };
+}
+
+async function stopObserving(): Promise<ExtensionResponse> {
+  const tab = await getActiveTab();
+
+  if (tab?.id === undefined) {
+    return scanErrorResponse(
+      "active_tab_unavailable",
+      "Active tab could not be identified.",
+    );
+  }
+
+  try {
+    await chrome.tabs.sendMessage<ExtensionMessage, ExtensionResponse>(tab.id, {
+      type: "STOP_OBSERVING",
+    });
+  } catch (error) {
+    logDebugError("Could not stop observer", error, { tabId: tab.id });
+  }
+
+  currentScanState = {
+    ...currentScanState,
+    status: "idle",
+    errorCode: null,
+    errorMessage: null,
+  };
+  console.info("[GBF Artifact Manager] observer stop", { tabId: tab.id });
+
+  return {
+    ok: true,
+    type: "OBSERVATION_STATUS",
+    message: "Observation stopped.",
+    observing: false,
+    scan: currentScanState,
+  };
+}
+
+async function handleObservedArtifactList(
+  message: Extract<ExtensionMessage, { type: "ARTIFACT_LIST_OBSERVED" }>,
+): Promise<ExtensionResponse> {
+  console.info("[GBF Artifact Manager] matched request URL", {
+    url: message.url,
+  });
 
   const scannedAt = new Date().toISOString();
-  const artifactListResult = await fetchCurrentArtifactList(
-    pageInfo.artifactPage,
-  );
+  const artifactListResult = validateObservedArtifactList(message.payload);
 
   if (!artifactListResult.ok) {
     return artifactListResult;
@@ -174,7 +221,7 @@ async function scanCurrentPage(): Promise<ExtensionResponse> {
   );
 
   currentScanState = {
-    status: "success",
+    status: "captured",
     currentPage: artifactList.current,
     lastPage: artifactList.last,
     totalCount: artifactList.count,
@@ -190,15 +237,36 @@ async function scanCurrentPage(): Promise<ExtensionResponse> {
     errorCode: null,
     errorMessage: null,
   };
+  chrome.runtime
+    .sendMessage({
+      type: "OBSERVATION_CAPTURED_UPDATE",
+      scan: currentScanState,
+    } satisfies ExtensionMessage)
+    .catch(() => {
+      // Popup may be closed; no action needed.
+    });
 
   return {
     ok: true,
-    type: "SCAN_CURRENT_PAGE_RESULT",
-    message: `Scanned ${artifacts.length} artifacts from page ${artifactList.current}.`,
+    type: "ARTIFACT_LIST_OBSERVED_RESULT",
+    message: `Captured ${artifacts.length} artifacts from page ${artifactList.current}.`,
     artifactCount: artifacts.length,
     page: artifactList.current,
     scan: currentScanState,
   };
+}
+
+async function injectPageObserver(tabId: number): Promise<void> {
+  await chrome.scripting.executeScript({
+    target: {
+      tabId,
+    },
+    files: ["assets/pageObserver.js"],
+    world: "MAIN",
+  });
+  console.info("[GBF Artifact Manager] observer injection requested", {
+    tabId,
+  });
 }
 
 async function getStoredArtifactCountResponse(): Promise<ExtensionResponse> {
@@ -265,48 +333,38 @@ async function clearStoredArtifacts(): Promise<ExtensionResponse> {
   }
 }
 
-async function getPageInfo(tabId: number): Promise<ExtensionResponse> {
-  try {
-    return await chrome.tabs.sendMessage<ExtensionMessage, ExtensionResponse>(
-      tabId,
-      {
-        type: "GET_PAGE_INFO",
-      },
-    );
-  } catch (error) {
-    logDebugError("Could not read current page info", error);
-    return scanErrorResponse(
-      "not_on_artifact_page",
-      "Open a GBF artifact page before scanning.",
-    );
-  }
-}
-
-async function fetchCurrentArtifactList(page: number): Promise<
+function validateObservedArtifactList(payload: unknown):
   | {
       ok: true;
       artifactList: ArtifactListResponse;
     }
-  | ErrorResponse
-> {
+  | ErrorResponse {
   try {
+    const artifactList = artifactListResponseSchema.parse(
+      payload,
+    ) as ArtifactListResponse;
+    console.info("[GBF Artifact Manager] validation success", {
+      page: artifactList.current,
+      artifactCount: artifactList.list.length,
+    });
+
     return {
-      ok: true as const,
-      artifactList: await fetchArtifactListPage(page),
+      ok: true,
+      artifactList,
     };
   } catch (error) {
     if (error instanceof ZodError) {
-      logZodError("Artifact list response validation failed", error);
+      logZodError("validation failure", error);
       return scanErrorResponse(
         "api_validation_failed",
         "Artifact list response did not match the expected shape.",
       );
     }
 
-    logDebugError("Artifact list request failed", error, { page });
+    logDebugError("Artifact list validation failed", error);
     return scanErrorResponse(
-      "request_failed",
-      "Artifact list request failed. Check the GBF page and network state.",
+      "api_validation_failed",
+      "Artifact list response did not match the expected shape.",
     );
   }
 }
@@ -330,13 +388,18 @@ async function persistScannedArtifacts(
     });
 
     const persistedArtifactCount = (await getAllArtifacts()).length;
+    console.info("[GBF Artifact Manager] persistence success", {
+      artifactCount: artifacts.length,
+      persistedArtifactCount,
+      scannedPage,
+    });
 
     return {
       ok: true,
       persistedArtifactCount,
     };
   } catch (error) {
-    logDebugError("Could not persist scanned artifacts", error, {
+    logDebugError("persistence failure", error, {
       artifactCount: artifacts.length,
       scannedPage,
     });
@@ -344,6 +407,18 @@ async function persistScannedArtifacts(
       "storage_failed",
       "Could not save scanned artifacts.",
     );
+  }
+}
+
+function isGranblueFantasyTab(tab: chrome.tabs.Tab): boolean {
+  if (tab.url === undefined) {
+    return false;
+  }
+
+  try {
+    return new URL(tab.url).hostname === "game.granbluefantasy.jp";
+  } catch {
+    return false;
   }
 }
 

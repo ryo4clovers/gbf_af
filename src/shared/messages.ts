@@ -4,7 +4,10 @@ import type { AppMode, ScanErrorCode, ScanState } from "../state/appState";
 export type ExtensionMessage =
   | GetAppStateMessage
   | SetAppModeMessage
-  | ScanCurrentPageMessage
+  | StartObservingMessage
+  | StopObservingMessage
+  | ArtifactListObservedMessage
+  | ObservationCapturedUpdateMessage
   | GetStoredArtifactCountMessage
   | GetStoredArtifactsMessage
   | ClearStoredArtifactsMessage
@@ -14,7 +17,8 @@ export type ExtensionMessage =
 export type ExtensionResponse =
   | AppStateResponse
   | PageInfoResponse
-  | ScanCurrentPageResponse
+  | ObservationStatusResponse
+  | ArtifactListObservedResponse
   | StoredArtifactCountResponse
   | StoredArtifactsResponse
   | ClearStoredArtifactsResponse
@@ -30,8 +34,24 @@ export type SetAppModeMessage = {
   mode: AppMode;
 };
 
-export type ScanCurrentPageMessage = {
-  type: "SCAN_CURRENT_PAGE";
+export type StartObservingMessage = {
+  type: "START_OBSERVING";
+};
+
+export type StopObservingMessage = {
+  type: "STOP_OBSERVING";
+};
+
+export type ArtifactListObservedMessage = {
+  type: "ARTIFACT_LIST_OBSERVED";
+  url: string;
+  page: number | null;
+  payload: unknown;
+};
+
+export type ObservationCapturedUpdateMessage = {
+  type: "OBSERVATION_CAPTURED_UPDATE";
+  scan: ScanState;
 };
 
 export type GetStoredArtifactCountMessage = {
@@ -70,9 +90,17 @@ export type PageInfoResponse = {
   artifactPage: number | null;
 };
 
-export type ScanCurrentPageResponse = {
+export type ObservationStatusResponse = {
   ok: true;
-  type: "SCAN_CURRENT_PAGE_RESULT";
+  type: "OBSERVATION_STATUS";
+  message: string;
+  observing: boolean;
+  scan: ScanState;
+};
+
+export type ArtifactListObservedResponse = {
+  ok: true;
+  type: "ARTIFACT_LIST_OBSERVED_RESULT";
   message: string;
   artifactCount: number;
   page: number;

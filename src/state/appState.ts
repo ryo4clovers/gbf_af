@@ -2,7 +2,13 @@ import { create } from "zustand";
 
 export type AppMode = "scan" | "manage";
 
-export type ScanStatus = "idle" | "scanning" | "success" | "error";
+export type ScanStatus =
+  | "idle"
+  | "scanning"
+  | "observing"
+  | "captured"
+  | "success"
+  | "error";
 
 export type ScanErrorCode =
   | "not_on_artifact_page"

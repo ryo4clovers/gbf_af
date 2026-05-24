@@ -1,32 +1,131 @@
 import type { ExtensionMessage, ExtensionResponse } from "../shared/messages";
 
+const OBSERVER_SOURCE = "gbf-artifact-manager";
+const CONTROL_MESSAGE_TYPE = "GBF_ARTIFACT_OBSERVER_CONTROL";
+const CAPTURE_MESSAGE_TYPE = "GBF_ARTIFACT_OBSERVER_CAPTURE";
+
 chrome.runtime.onMessage.addListener(
   (
     message: ExtensionMessage,
     _sender,
     sendResponse: (response: ExtensionResponse) => void,
   ) => {
-    if (message.type !== "GET_PAGE_INFO") {
+    if (message.type === "START_OBSERVING") {
+      postObserverControlMessage("start");
+      sendResponse({
+        ok: true,
+        type: "OBSERVATION_STATUS",
+        message: "Observation started.",
+        observing: true,
+        scan: {
+          status: "observing",
+          currentPage: null,
+          lastPage: null,
+          totalCount: null,
+          scannedArtifactCount: 0,
+          persistedArtifactCount: 0,
+          lastScannedPage: null,
+          lastScanArtifactCount: 0,
+          scannedPages: [],
+          lastScannedAt: null,
+          errorCode: null,
+          errorMessage: null,
+        },
+      });
       return false;
     }
 
-    const url = window.location.href;
-    const artifactPage = detectCurrentArtifactPage(url);
-    const isArtifactPage = isArtifactUrl(url) || hasArtifactListMarkup();
+    if (message.type === "STOP_OBSERVING") {
+      postObserverControlMessage("stop");
+      sendResponse({
+        ok: true,
+        type: "OBSERVATION_STATUS",
+        message: "Observation stopped.",
+        observing: false,
+        scan: {
+          status: "idle",
+          currentPage: null,
+          lastPage: null,
+          totalCount: null,
+          scannedArtifactCount: 0,
+          persistedArtifactCount: 0,
+          lastScannedPage: null,
+          lastScanArtifactCount: 0,
+          scannedPages: [],
+          lastScannedAt: null,
+          errorCode: null,
+          errorMessage: null,
+        },
+      });
+      return false;
+    }
 
-    sendResponse({
-      ok: true,
-      type: "PAGE_INFO",
-      url,
-      isGranblueFantasyPage:
-        window.location.hostname === "game.granbluefantasy.jp",
-      isArtifactPage,
-      artifactPage,
-    });
+    if (message.type === "GET_PAGE_INFO") {
+      const url = window.location.href;
+      const artifactPage = detectCurrentArtifactPage(url);
+      const isArtifactPage = isArtifactUrl(url) || hasArtifactListMarkup();
+
+      sendResponse({
+        ok: true,
+        type: "PAGE_INFO",
+        url,
+        isGranblueFantasyPage:
+          window.location.hostname === "game.granbluefantasy.jp",
+        isArtifactPage,
+        artifactPage,
+      });
+      return false;
+    }
 
     return false;
   },
 );
+
+window.addEventListener("message", (event) => {
+  if (event.source !== window) {
+    return;
+  }
+
+  const data = event.data;
+
+  if (
+    typeof data !== "object" ||
+    data === null ||
+    data.source !== OBSERVER_SOURCE ||
+    data.type !== CAPTURE_MESSAGE_TYPE
+  ) {
+    return;
+  }
+
+  console.info("[GBF Artifact Manager] content received captured response", {
+    url: data.url,
+    page: data.page,
+  });
+
+  chrome.runtime
+    .sendMessage({
+      type: "ARTIFACT_LIST_OBSERVED",
+      url: String(data.url),
+      page: typeof data.page === "number" ? data.page : null,
+      payload: data.payload,
+    })
+    .catch((error: unknown) => {
+      console.error("[GBF Artifact Manager] capture forwarding failed", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+    });
+});
+
+function postObserverControlMessage(action: "start" | "stop") {
+  window.postMessage(
+    {
+      source: OBSERVER_SOURCE,
+      type: CONTROL_MESSAGE_TYPE,
+      action,
+    },
+    window.location.origin,
+  );
+}
 
 function isArtifactUrl(url: string): boolean {
   return /(?:#|\/)artifact(?:\/|$)/.test(url);
