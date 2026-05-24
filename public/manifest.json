@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "GBF Artifact Manager",
+  "description": "Read-only local management tools for Granblue Fantasy Artifacts.",
+  "version": "0.1.0",
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "assets/background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://game.granbluefantasy.jp/*"],
+      "js": ["assets/content.js"]
+    }
+  ],
+  "permissions": ["storage", "tabs"],
+  "host_permissions": ["https://game.granbluefantasy.jp/*"]
+}

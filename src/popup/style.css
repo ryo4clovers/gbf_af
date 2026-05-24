@@ -1,0 +1,86 @@
+body {
+  margin: 0;
+  color: #1f2933;
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  background: #f7f8fa;
+}
+
+button {
+  border: 1px solid #c7ced8;
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: #1f2933;
+  font: inherit;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #eef2f6;
+}
+
+.popup {
+  width: 320px;
+  padding: 16px;
+}
+
+.popup h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.popup p {
+  margin: 4px 0 0;
+  color: #52616f;
+  font-size: 13px;
+}
+
+.modeButtons,
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.modeButtons .active {
+  border-color: #3366cc;
+  color: #ffffff;
+  background: #3366cc;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.summary div {
+  border: 1px solid #d8dee8;
+  border-radius: 6px;
+  padding: 10px;
+  background: #ffffff;
+}
+
+.summary span {
+  display: block;
+  color: #697586;
+  font-size: 12px;
+}
+
+.summary strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 16px;
+}
+
+.status {
+  min-height: 18px;
+  margin-top: 12px;
+}
