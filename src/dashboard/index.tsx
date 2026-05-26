@@ -82,6 +82,7 @@ function Dashboard() {
   const [scoreProfileError, setScoreProfileError] = useState<string | null>(
     null,
   );
+  const [newScoreProfileName, setNewScoreProfileName] = useState("");
   const [filters, setFilters] = useState<ArtifactFilters>(initialFilters);
   const [sort, setSort] = useState<ArtifactSort>({
     key: "totalScore",
@@ -273,7 +274,9 @@ function Dashboard() {
     }
   };
 
-  const saveSelectedScoreProfile = async (profileId: string) => {
+  const saveSelectedScoreProfile = async (
+    profileId: string,
+  ): Promise<boolean> => {
     setSelectedScoreProfileId(profileId);
     setScoreProfileError(null);
 
@@ -284,12 +287,97 @@ function Dashboard() {
 
     if (!response.ok) {
       setScoreProfileError("Could not save selected score profile.");
-      return;
+      return false;
     }
 
     if (response.type === "SAVE_SELECTED_SCORE_PROFILE_ID_RESULT") {
       setSelectedScoreProfileId(response.profileId);
     }
+
+    return true;
+  };
+
+  const createScoreProfile = async () => {
+    const profileName = newScoreProfileName.trim();
+
+    if (profileName.length === 0) {
+      setScoreProfileError("Profile name is required.");
+      return;
+    }
+
+    const timestamp = new Date().toISOString();
+    const profile: ScoreProfile = {
+      id: `profile-${Date.now()}`,
+      name: profileName,
+      idealSkillKeys: [...activeScoreProfile.idealSkillKeys],
+      skillPriority: activeScoreProfile.skillPriority.map((entry) => ({
+        ...entry,
+      })),
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+
+    setScoreProfileError(null);
+
+    const saveProfileResponse = await sendRuntimeMessage({
+      type: "SAVE_SCORE_PROFILE",
+      profile,
+    });
+
+    if (!saveProfileResponse.ok) {
+      setScoreProfileError("Could not create score profile.");
+      return;
+    }
+
+    setScoreProfiles((current) => [
+      ...current.filter((currentProfile) => currentProfile.id !== profile.id),
+      profile,
+    ]);
+
+    const didSaveSelection = await saveSelectedScoreProfile(profile.id);
+
+    if (didSaveSelection) {
+      setNewScoreProfileName("");
+    }
+  };
+
+  const deleteActiveScoreProfile = async () => {
+    const availableProfiles =
+      scoreProfiles.length > 0 ? scoreProfiles : [DEFAULT_SCORE_PROFILE];
+
+    if (availableProfiles.length <= 1) {
+      setScoreProfileError("At least one score profile is required.");
+      return;
+    }
+
+    if (!window.confirm("Delete this score profile?")) {
+      return;
+    }
+
+    setScoreProfileError(null);
+
+    const deleteResponse = await sendRuntimeMessage({
+      type: "DELETE_SCORE_PROFILE",
+      profileId: activeScoreProfile.id,
+    });
+
+    if (!deleteResponse.ok) {
+      setScoreProfileError("Could not delete score profile.");
+      return;
+    }
+
+    const remainingProfiles = availableProfiles.filter(
+      (profile) => profile.id !== activeScoreProfile.id,
+    );
+    const fallbackProfile = remainingProfiles[0] ?? DEFAULT_SCORE_PROFILE;
+
+    setScoreProfiles(
+      remainingProfiles.length > 0
+        ? remainingProfiles
+        : [DEFAULT_SCORE_PROFILE],
+    );
+
+    await saveSelectedScoreProfile(fallbackProfile.id);
   };
 
   const updateMemoDraft = (ownedId: number, memo: string) => {
@@ -368,8 +456,12 @@ function Dashboard() {
           <StatisticsSummary statistics={statistics} />
           <CustomScoreProfileSummary
             activeProfile={activeScoreProfile}
+            newProfileName={newScoreProfileName}
             errorMessage={scoreProfileError}
             profiles={scoreProfiles}
+            onCreateProfile={createScoreProfile}
+            onDeleteProfile={deleteActiveScoreProfile}
+            onNewProfileNameChange={setNewScoreProfileName}
             onProfileChange={saveSelectedScoreProfile}
           />
 
@@ -489,13 +581,21 @@ function StatisticsSummary({ statistics }: { statistics: ArtifactStatistics }) {
 
 function CustomScoreProfileSummary({
   activeProfile,
+  newProfileName,
   errorMessage,
   profiles,
+  onCreateProfile,
+  onDeleteProfile,
+  onNewProfileNameChange,
   onProfileChange,
 }: {
   activeProfile: ScoreProfile;
+  newProfileName: string;
   errorMessage: string | null;
   profiles: ScoreProfile[];
+  onCreateProfile: () => void;
+  onDeleteProfile: () => void;
+  onNewProfileNameChange: (name: string) => void;
   onProfileChange: (profileId: string) => void;
 }) {
   const profileOptions =
@@ -503,19 +603,40 @@ function CustomScoreProfileSummary({
 
   return (
     <section className="customScoreProfileSummary" aria-label="Custom score">
-      <label>
-        Custom Score Profile
-        <select
-          value={activeProfile.id}
-          onChange={(event) => onProfileChange(event.currentTarget.value)}
-        >
-          {profileOptions.map((profile) => (
-            <option key={profile.id} value={profile.id}>
-              {profile.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className="scoreProfileRow">
+        <label>
+          Custom Score Profile
+          <select
+            value={activeProfile.id}
+            onChange={(event) => onProfileChange(event.currentTarget.value)}
+          >
+            {profileOptions.map((profile) => (
+              <option key={profile.id} value={profile.id}>
+                {profile.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="button" onClick={onDeleteProfile}>
+          Delete
+        </button>
+      </div>
+      <div className="scoreProfileRow">
+        <label>
+          New profile
+          <input
+            type="text"
+            value={newProfileName}
+            onChange={(event) =>
+              onNewProfileNameChange(event.currentTarget.value)
+            }
+            placeholder="Profile name"
+          />
+        </label>
+        <button type="button" onClick={onCreateProfile}>
+          Create Profile
+        </button>
+      </div>
       {errorMessage !== null && <p>{errorMessage}</p>}
     </section>
   );
