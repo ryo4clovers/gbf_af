@@ -8,9 +8,11 @@ import type {
 } from "../domain/artifactUserReview";
 import type { ArtifactPresence } from "../domain/scanSession";
 import { evaluateCustomScore } from "../domain/score/evaluateCustomScore";
-import type {
-  ScoreProfile,
-  UnwantedSkillConfig,
+import {
+  DEFAULT_SCORE_PROFILE,
+  DEFAULT_UNWANTED_SKILL_CONFIG,
+  type ScoreProfile,
+  type UnwantedSkillConfig,
 } from "../domain/score/scoreProfile";
 import type { ScoreReason, ScoreResult } from "../domain/score/scoreResult";
 import { sendRuntimeMessage } from "../shared/chromeMessages";
@@ -60,33 +62,6 @@ type ReviewedArtifactRow = {
   customScore: ScoreResult;
 };
 
-// TODO: Replace this temporary profile with persisted user-defined score profiles.
-const TEMP_DEFAULT_SCORE_PROFILE: ScoreProfile = {
-  id: "temp-default",
-  name: "Temporary Default",
-  idealSkillKeys: [
-    "normal_attack_damage_cap",
-    "element_attack",
-    "triple_attack_rate",
-    "attack_power",
-  ],
-  skillPriority: [
-    { skillKey: "normal_attack_damage_cap", rank: 1 },
-    { skillKey: "element_attack", rank: 2 },
-    { skillKey: "ougi_damage_cap", rank: 3 },
-    { skillKey: "ability_damage_cap", rank: 4 },
-    { skillKey: "triple_attack_rate", rank: 5 },
-    { skillKey: "attack_power", rank: 6 },
-  ],
-  createdAt: "temporary",
-  updatedAt: "temporary",
-};
-
-const TEMP_UNWANTED_SKILL_CONFIG: UnwantedSkillConfig = {
-  skillKeys: ["debuff_resistance", "healing_performance"],
-  updatedAt: "temporary",
-};
-
 function Dashboard() {
   const { mode, scan, setMode, setScanState } = useAppStore();
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
@@ -96,6 +71,17 @@ function Dashboard() {
   const [presenceByOwnedId, setPresenceByOwnedId] = useState<
     Record<number, ArtifactPresence>
   >({});
+  const [scoreProfiles, setScoreProfiles] = useState<ScoreProfile[]>([
+    DEFAULT_SCORE_PROFILE,
+  ]);
+  const [selectedScoreProfileId, setSelectedScoreProfileId] = useState<
+    string | null
+  >(DEFAULT_SCORE_PROFILE.id);
+  const [unwantedSkillConfig, setUnwantedSkillConfig] =
+    useState<UnwantedSkillConfig>(DEFAULT_UNWANTED_SKILL_CONFIG);
+  const [scoreProfileError, setScoreProfileError] = useState<string | null>(
+    null,
+  );
   const [filters, setFilters] = useState<ArtifactFilters>(initialFilters);
   const [sort, setSort] = useState<ArtifactSort>({
     key: "totalScore",
@@ -103,11 +89,17 @@ function Dashboard() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Loading artifacts...");
+  const activeScoreProfile = getActiveScoreProfile(
+    scoreProfiles,
+    selectedScoreProfileId,
+  );
   const artifactRows = artifacts.map((artifact) =>
     buildArtifactScoreViewModel({
       artifact,
       review: reviewsByOwnedId[artifact.ownedId] ?? null,
       presence: presenceByOwnedId[artifact.ownedId] ?? null,
+      scoreProfile: activeScoreProfile,
+      unwantedSkillConfig,
     }),
   );
   const statistics = calculateArtifactStatistics({
@@ -127,12 +119,21 @@ function Dashboard() {
     setIsLoading(true);
     setStatusMessage("Loading artifacts...");
 
-    const [artifactResponse, reviewResponse, presenceResponse] =
-      await Promise.all([
-        sendRuntimeMessage({ type: "GET_STORED_ARTIFACTS" }),
-        sendRuntimeMessage({ type: "GET_ARTIFACT_USER_REVIEWS" }),
-        sendRuntimeMessage({ type: "GET_ARTIFACT_PRESENCE" }),
-      ]);
+    const [
+      artifactResponse,
+      reviewResponse,
+      presenceResponse,
+      scoreProfilesResponse,
+      selectedScoreProfileResponse,
+      unwantedSkillConfigResponse,
+    ] = await Promise.all([
+      sendRuntimeMessage({ type: "GET_STORED_ARTIFACTS" }),
+      sendRuntimeMessage({ type: "GET_ARTIFACT_USER_REVIEWS" }),
+      sendRuntimeMessage({ type: "GET_ARTIFACT_PRESENCE" }),
+      sendRuntimeMessage({ type: "GET_SCORE_PROFILES" }),
+      sendRuntimeMessage({ type: "GET_SELECTED_SCORE_PROFILE_ID" }),
+      sendRuntimeMessage({ type: "GET_UNWANTED_SKILL_CONFIG" }),
+    ]);
 
     if (!artifactResponse.ok) {
       if (artifactResponse.scan !== undefined) {
@@ -167,6 +168,44 @@ function Dashboard() {
 
     if (presenceResponse.type === "ARTIFACT_PRESENCE") {
       setPresenceByOwnedId(presenceResponse.presence);
+    }
+
+    if (
+      scoreProfilesResponse.ok &&
+      scoreProfilesResponse.type === "SCORE_PROFILES"
+    ) {
+      setScoreProfiles(scoreProfilesResponse.profiles);
+    } else {
+      setScoreProfiles([DEFAULT_SCORE_PROFILE]);
+      setScoreProfileError("Custom score profile could not be loaded.");
+    }
+
+    if (
+      selectedScoreProfileResponse.ok &&
+      selectedScoreProfileResponse.type === "SELECTED_SCORE_PROFILE_ID"
+    ) {
+      setSelectedScoreProfileId(selectedScoreProfileResponse.profileId);
+    } else {
+      setSelectedScoreProfileId(DEFAULT_SCORE_PROFILE.id);
+      setScoreProfileError("Custom score profile could not be loaded.");
+    }
+
+    if (
+      unwantedSkillConfigResponse.ok &&
+      unwantedSkillConfigResponse.type === "UNWANTED_SKILL_CONFIG"
+    ) {
+      setUnwantedSkillConfig(unwantedSkillConfigResponse.config);
+    } else {
+      setUnwantedSkillConfig(DEFAULT_UNWANTED_SKILL_CONFIG);
+      setScoreProfileError("Custom score profile could not be loaded.");
+    }
+
+    if (
+      scoreProfilesResponse.ok &&
+      selectedScoreProfileResponse.ok &&
+      unwantedSkillConfigResponse.ok
+    ) {
+      setScoreProfileError(null);
     }
 
     setStatusMessage(
@@ -231,6 +270,25 @@ function Dashboard() {
         [response.review.ownedId]: response.review,
       }));
       setStatusMessage(`Saved review for ${response.review.ownedId}.`);
+    }
+  };
+
+  const saveSelectedScoreProfile = async (profileId: string) => {
+    setSelectedScoreProfileId(profileId);
+    setScoreProfileError(null);
+
+    const response = await sendRuntimeMessage({
+      type: "SAVE_SELECTED_SCORE_PROFILE_ID",
+      profileId,
+    });
+
+    if (!response.ok) {
+      setScoreProfileError("Could not save selected score profile.");
+      return;
+    }
+
+    if (response.type === "SAVE_SELECTED_SCORE_PROFILE_ID_RESULT") {
+      setSelectedScoreProfileId(response.profileId);
     }
   };
 
@@ -308,6 +366,12 @@ function Dashboard() {
           </div>
 
           <StatisticsSummary statistics={statistics} />
+          <CustomScoreProfileSummary
+            activeProfile={activeScoreProfile}
+            errorMessage={scoreProfileError}
+            profiles={scoreProfiles}
+            onProfileChange={saveSelectedScoreProfile}
+          />
 
           <ArtifactControls
             artifactCount={artifacts.length}
@@ -419,6 +483,40 @@ function StatisticsSummary({ statistics }: { statistics: ArtifactStatistics }) {
         <DistributionTable title="Kinds" rows={statistics.kindCounts} />
         <SkillStatisticsTable rows={topSkillCounts} />
       </div>
+    </section>
+  );
+}
+
+function CustomScoreProfileSummary({
+  activeProfile,
+  errorMessage,
+  profiles,
+  onProfileChange,
+}: {
+  activeProfile: ScoreProfile;
+  errorMessage: string | null;
+  profiles: ScoreProfile[];
+  onProfileChange: (profileId: string) => void;
+}) {
+  const profileOptions =
+    profiles.length > 0 ? profiles : [DEFAULT_SCORE_PROFILE];
+
+  return (
+    <section className="customScoreProfileSummary" aria-label="Custom score">
+      <label>
+        Custom Score Profile
+        <select
+          value={activeProfile.id}
+          onChange={(event) => onProfileChange(event.currentTarget.value)}
+        >
+          {profileOptions.map((profile) => (
+            <option key={profile.id} value={profile.id}>
+              {profile.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      {errorMessage !== null && <p>{errorMessage}</p>}
     </section>
   );
 }
@@ -974,15 +1072,30 @@ function buildArtifactScoreViewModel(args: {
   artifact: Artifact;
   review: ArtifactUserReview | null;
   presence: ArtifactPresence | null;
+  scoreProfile: ScoreProfile;
+  unwantedSkillConfig: UnwantedSkillConfig;
 }): ReviewedArtifactRow {
   return {
-    ...args,
+    artifact: args.artifact,
+    review: args.review,
+    presence: args.presence,
     customScore: evaluateCustomScore({
       artifact: args.artifact,
-      profile: TEMP_DEFAULT_SCORE_PROFILE,
-      unwantedSkillConfig: TEMP_UNWANTED_SKILL_CONFIG,
+      profile: args.scoreProfile,
+      unwantedSkillConfig: args.unwantedSkillConfig,
     }),
   };
+}
+
+function getActiveScoreProfile(
+  scoreProfiles: ScoreProfile[],
+  selectedScoreProfileId: string | null,
+): ScoreProfile {
+  const selectedProfile = scoreProfiles.find(
+    (profile) => profile.id === selectedScoreProfileId,
+  );
+
+  return selectedProfile ?? scoreProfiles[0] ?? DEFAULT_SCORE_PROFILE;
 }
 
 function formatShortScoreReasons(reasons: ScoreReason[]): string {

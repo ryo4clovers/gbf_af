@@ -11,6 +11,10 @@ import {
 import { normalizeArtifact } from "../domain/normalizeArtifact";
 import type { ArtifactPresence, ScanSession } from "../domain/scanSession";
 import type {
+  ScoreProfile,
+  UnwantedSkillConfig,
+} from "../domain/score/scoreProfile";
+import type {
   ErrorResponse,
   ExtensionMessage,
   ExtensionResponse,
@@ -25,6 +29,7 @@ import {
   clearAllArtifacts,
   clearArtifactUserReviews,
   createScanSession,
+  deleteScoreProfile,
   finishActiveScanSession,
   getActiveScanSession,
   getAllArtifacts,
@@ -32,9 +37,16 @@ import {
   getArtifactUserReviews,
   getLatestScanSession,
   getScanMetadata,
+  getScoreProfile,
+  getScoreProfiles,
+  getSelectedScoreProfileId,
+  getUnwantedSkillConfig,
   markMissingArtifactsPossiblyDeleted,
   saveArtifactUserReview,
   saveScannedArtifacts,
+  saveScoreProfile,
+  saveSelectedScoreProfileId,
+  saveUnwantedSkillConfig,
   updateArtifactPresence,
   updateScanSession,
 } from "../storage/artifactIndexedDb";
@@ -146,6 +158,22 @@ async function handleMessage(
       return getScanSessionsResponse();
     case "GET_ARTIFACT_PRESENCE":
       return getArtifactPresenceResponse();
+    case "GET_SCORE_PROFILES":
+      return getScoreProfilesResponse();
+    case "GET_SCORE_PROFILE":
+      return getScoreProfileResponse(message.profileId);
+    case "SAVE_SCORE_PROFILE":
+      return saveScoreProfileResponse(message.profile);
+    case "DELETE_SCORE_PROFILE":
+      return deleteScoreProfileResponse(message.profileId);
+    case "GET_UNWANTED_SKILL_CONFIG":
+      return getUnwantedSkillConfigResponse();
+    case "SAVE_UNWANTED_SKILL_CONFIG":
+      return saveUnwantedSkillConfigResponse(message.config);
+    case "GET_SELECTED_SCORE_PROFILE_ID":
+      return getSelectedScoreProfileIdResponse();
+    case "SAVE_SELECTED_SCORE_PROFILE_ID":
+      return saveSelectedScoreProfileIdResponse(message.profileId);
     case "OPEN_DASHBOARD":
       await chrome.tabs.create({
         url: chrome.runtime.getURL("dashboard.html"),
@@ -883,6 +911,162 @@ async function getArtifactPresenceResponse(): Promise<ExtensionResponse> {
   }
 }
 
+async function getScoreProfilesResponse(): Promise<ExtensionResponse> {
+  try {
+    return {
+      ok: true,
+      type: "SCORE_PROFILES",
+      profiles: await getScoreProfiles(),
+    };
+  } catch (error) {
+    logDebugError("Could not read score profiles", error);
+    return storageErrorResponse("Could not read score profiles.");
+  }
+}
+
+async function getScoreProfileResponse(
+  profileId: string,
+): Promise<ExtensionResponse> {
+  if (!isNonEmptyString(profileId)) {
+    return validationMessageResponse("Score profile id is required.");
+  }
+
+  try {
+    return {
+      ok: true,
+      type: "SCORE_PROFILE",
+      profile: await getScoreProfile(profileId),
+    };
+  } catch (error) {
+    logDebugError("Could not read score profile", error, { profileId });
+    return storageErrorResponse("Could not read score profile.");
+  }
+}
+
+async function saveScoreProfileResponse(
+  profile: ScoreProfile,
+): Promise<ExtensionResponse> {
+  const validationError = validateScoreProfile(profile);
+
+  if (validationError !== null) {
+    return validationMessageResponse(validationError);
+  }
+
+  try {
+    await saveScoreProfile(profile);
+
+    return {
+      ok: true,
+      type: "SAVE_SCORE_PROFILE_RESULT",
+      profile,
+    };
+  } catch (error) {
+    logDebugError("Could not save score profile", error, {
+      profileId: profile.id,
+    });
+    return storageErrorResponse("Could not save score profile.");
+  }
+}
+
+async function deleteScoreProfileResponse(
+  profileId: string,
+): Promise<ExtensionResponse> {
+  if (!isNonEmptyString(profileId)) {
+    return validationMessageResponse("Score profile id is required.");
+  }
+
+  try {
+    await deleteScoreProfile(profileId);
+
+    return {
+      ok: true,
+      type: "DELETE_SCORE_PROFILE_RESULT",
+      profileId,
+    };
+  } catch (error) {
+    logDebugError("Could not delete score profile", error, { profileId });
+    return storageErrorResponse("Could not delete score profile.");
+  }
+}
+
+async function getUnwantedSkillConfigResponse(): Promise<ExtensionResponse> {
+  try {
+    return {
+      ok: true,
+      type: "UNWANTED_SKILL_CONFIG",
+      config: await getUnwantedSkillConfig(),
+    };
+  } catch (error) {
+    logDebugError("Could not read unwanted skill config", error);
+    return storageErrorResponse("Could not read unwanted skill config.");
+  }
+}
+
+async function saveUnwantedSkillConfigResponse(
+  config: UnwantedSkillConfig,
+): Promise<ExtensionResponse> {
+  const validationError = validateUnwantedSkillConfig(config);
+
+  if (validationError !== null) {
+    return validationMessageResponse(validationError);
+  }
+
+  try {
+    await saveUnwantedSkillConfig(config);
+
+    return {
+      ok: true,
+      type: "SAVE_UNWANTED_SKILL_CONFIG_RESULT",
+      config,
+    };
+  } catch (error) {
+    logDebugError("Could not save unwanted skill config", error);
+    return storageErrorResponse("Could not save unwanted skill config.");
+  }
+}
+
+async function getSelectedScoreProfileIdResponse(): Promise<ExtensionResponse> {
+  try {
+    return {
+      ok: true,
+      type: "SELECTED_SCORE_PROFILE_ID",
+      profileId: await getSelectedScoreProfileId(),
+    };
+  } catch (error) {
+    logDebugError("Could not read selected score profile id", error);
+    return storageErrorResponse("Could not read selected score profile.");
+  }
+}
+
+async function saveSelectedScoreProfileIdResponse(
+  profileId: string | null,
+): Promise<ExtensionResponse> {
+  if (profileId !== null && !isNonEmptyString(profileId)) {
+    return validationMessageResponse("Selected score profile id is invalid.");
+  }
+
+  try {
+    if (profileId !== null && (await getScoreProfile(profileId)) === null) {
+      return validationMessageResponse(
+        "Selected score profile does not exist.",
+      );
+    }
+
+    await saveSelectedScoreProfileId(profileId);
+
+    return {
+      ok: true,
+      type: "SAVE_SELECTED_SCORE_PROFILE_ID_RESULT",
+      profileId,
+    };
+  } catch (error) {
+    logDebugError("Could not save selected score profile id", error, {
+      profileId,
+    });
+    return storageErrorResponse("Could not save selected score profile.");
+  }
+}
+
 function validateObservedArtifactList(payload: unknown):
   | {
       ok: true;
@@ -1114,6 +1298,68 @@ function scanErrorResponse(
     errorCode,
     scan: currentScanState,
   };
+}
+
+function storageErrorResponse(message: string): ErrorResponse {
+  return {
+    ok: false,
+    type: "ERROR",
+    message,
+    errorCode: "storage_failed",
+  };
+}
+
+function validationMessageResponse(message: string): ErrorResponse {
+  return {
+    ok: false,
+    type: "ERROR",
+    message,
+    errorCode: "unexpected_response",
+  };
+}
+
+function validateScoreProfile(profile: ScoreProfile): string | null {
+  if (!isNonEmptyString(profile.id)) {
+    return "Score profile id is required.";
+  }
+
+  if (!isNonEmptyString(profile.name)) {
+    return "Score profile name is required.";
+  }
+
+  if (profile.idealSkillKeys.length > 4) {
+    return "Score profile ideal skills must contain at most 4 skills.";
+  }
+
+  if (!profile.idealSkillKeys.every(isNonEmptyString)) {
+    return "Score profile ideal skill keys must be non-empty strings.";
+  }
+
+  for (const entry of profile.skillPriority) {
+    if (!isNonEmptyString(entry.skillKey)) {
+      return "Score profile priority skill keys must be non-empty strings.";
+    }
+
+    if (!Number.isFinite(entry.rank) || entry.rank < 1) {
+      return "Score profile priority ranks must be positive numbers.";
+    }
+  }
+
+  return null;
+}
+
+function validateUnwantedSkillConfig(
+  config: UnwantedSkillConfig,
+): string | null {
+  if (!config.skillKeys.every(isNonEmptyString)) {
+    return "Unwanted skill keys must be non-empty strings.";
+  }
+
+  return null;
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
 }
 
 function displayErrorResponse(

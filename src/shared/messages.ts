@@ -2,6 +2,10 @@ import type { Artifact } from "../domain/artifact";
 import type { ArtifactUserReview } from "../domain/artifactUserReview";
 import type { DisplayState } from "../domain/displayMode";
 import type { ArtifactPresence, ScanSession } from "../domain/scanSession";
+import type {
+  ScoreProfile,
+  UnwantedSkillConfig,
+} from "../domain/score/scoreProfile";
 import type { AppMode, ScanErrorCode, ScanState } from "../state/appState";
 
 export type ExtensionMessage =
@@ -24,6 +28,14 @@ export type ExtensionMessage =
   | ClearArtifactUserReviewsMessage
   | GetScanSessionsMessage
   | GetArtifactPresenceMessage
+  | GetScoreProfilesMessage
+  | GetScoreProfileMessage
+  | SaveScoreProfileMessage
+  | DeleteScoreProfileMessage
+  | GetUnwantedSkillConfigMessage
+  | SaveUnwantedSkillConfigMessage
+  | GetSelectedScoreProfileIdMessage
+  | SaveSelectedScoreProfileIdMessage
   | OpenDashboardMessage
   | GetPageInfoMessage;
 
@@ -43,6 +55,14 @@ export type ExtensionResponse =
   | ClearArtifactUserReviewsResponse
   | ScanSessionsResponse
   | ArtifactPresenceResponse
+  | ScoreProfilesResponse
+  | ScoreProfileResponse
+  | SaveScoreProfileResponse
+  | DeleteScoreProfileResponse
+  | UnwantedSkillConfigResponse
+  | SaveUnwantedSkillConfigResponse
+  | SelectedScoreProfileIdResponse
+  | SaveSelectedScoreProfileIdResponse
   | OpenDashboardResponse
   | ErrorResponse;
 
@@ -127,6 +147,43 @@ export type GetScanSessionsMessage = {
 
 export type GetArtifactPresenceMessage = {
   type: "GET_ARTIFACT_PRESENCE";
+};
+
+export type GetScoreProfilesMessage = {
+  type: "GET_SCORE_PROFILES";
+};
+
+export type GetScoreProfileMessage = {
+  type: "GET_SCORE_PROFILE";
+  profileId: string;
+};
+
+export type SaveScoreProfileMessage = {
+  type: "SAVE_SCORE_PROFILE";
+  profile: ScoreProfile;
+};
+
+export type DeleteScoreProfileMessage = {
+  type: "DELETE_SCORE_PROFILE";
+  profileId: string;
+};
+
+export type GetUnwantedSkillConfigMessage = {
+  type: "GET_UNWANTED_SKILL_CONFIG";
+};
+
+export type SaveUnwantedSkillConfigMessage = {
+  type: "SAVE_UNWANTED_SKILL_CONFIG";
+  config: UnwantedSkillConfig;
+};
+
+export type GetSelectedScoreProfileIdMessage = {
+  type: "GET_SELECTED_SCORE_PROFILE_ID";
+};
+
+export type SaveSelectedScoreProfileIdMessage = {
+  type: "SAVE_SELECTED_SCORE_PROFILE_ID";
+  profileId: string | null;
 };
 
 export type OpenDashboardMessage = {
@@ -240,6 +297,54 @@ export type ArtifactPresenceResponse = {
   ok: true;
   type: "ARTIFACT_PRESENCE";
   presence: Record<number, ArtifactPresence>;
+};
+
+export type ScoreProfilesResponse = {
+  ok: true;
+  type: "SCORE_PROFILES";
+  profiles: ScoreProfile[];
+};
+
+export type ScoreProfileResponse = {
+  ok: true;
+  type: "SCORE_PROFILE";
+  profile: ScoreProfile | null;
+};
+
+export type SaveScoreProfileResponse = {
+  ok: true;
+  type: "SAVE_SCORE_PROFILE_RESULT";
+  profile: ScoreProfile;
+};
+
+export type DeleteScoreProfileResponse = {
+  ok: true;
+  type: "DELETE_SCORE_PROFILE_RESULT";
+  profileId: string;
+};
+
+export type UnwantedSkillConfigResponse = {
+  ok: true;
+  type: "UNWANTED_SKILL_CONFIG";
+  config: UnwantedSkillConfig;
+};
+
+export type SaveUnwantedSkillConfigResponse = {
+  ok: true;
+  type: "SAVE_UNWANTED_SKILL_CONFIG_RESULT";
+  config: UnwantedSkillConfig;
+};
+
+export type SelectedScoreProfileIdResponse = {
+  ok: true;
+  type: "SELECTED_SCORE_PROFILE_ID";
+  profileId: string | null;
+};
+
+export type SaveSelectedScoreProfileIdResponse = {
+  ok: true;
+  type: "SAVE_SELECTED_SCORE_PROFILE_ID_RESULT";
+  profileId: string | null;
 };
 
 export type OpenDashboardResponse = {
