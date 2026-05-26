@@ -7,6 +7,12 @@ import type {
   ArtifactUserReview,
 } from "../domain/artifactUserReview";
 import type { ArtifactPresence } from "../domain/scanSession";
+import { evaluateCustomScore } from "../domain/score/evaluateCustomScore";
+import type {
+  ScoreProfile,
+  UnwantedSkillConfig,
+} from "../domain/score/scoreProfile";
+import type { ScoreReason, ScoreResult } from "../domain/score/scoreResult";
 import { sendRuntimeMessage } from "../shared/chromeMessages";
 import { useAppStore } from "../state/appState";
 import {
@@ -19,7 +25,7 @@ type LockedFilter = "all" | "locked" | "unlocked";
 type EquippedFilter = "all" | "equipped" | "unequipped";
 type RatingFilter = "all" | "unrated" | "1" | "2" | "3" | "4" | "5";
 type LifecycleFilter = "all" | "active" | "possiblyDeleted";
-type SortKey = "totalScore" | "ownedId" | "name" | "rating";
+type SortKey = "totalScore" | "ownedId" | "name" | "rating" | "customScore";
 type SortDirection = "asc" | "desc";
 
 type ArtifactFilters = {
@@ -51,6 +57,34 @@ type ReviewedArtifactRow = {
   artifact: Artifact;
   review: ArtifactUserReview | null;
   presence: ArtifactPresence | null;
+  customScore: ScoreResult;
+};
+
+// TODO: Replace this temporary profile with persisted user-defined score profiles.
+const TEMP_DEFAULT_SCORE_PROFILE: ScoreProfile = {
+  id: "temp-default",
+  name: "Temporary Default",
+  idealSkillKeys: [
+    "normal_attack_damage_cap",
+    "element_attack",
+    "triple_attack_rate",
+    "attack_power",
+  ],
+  skillPriority: [
+    { skillKey: "normal_attack_damage_cap", rank: 1 },
+    { skillKey: "element_attack", rank: 2 },
+    { skillKey: "ougi_damage_cap", rank: 3 },
+    { skillKey: "ability_damage_cap", rank: 4 },
+    { skillKey: "triple_attack_rate", rank: 5 },
+    { skillKey: "attack_power", rank: 6 },
+  ],
+  createdAt: "temporary",
+  updatedAt: "temporary",
+};
+
+const TEMP_UNWANTED_SKILL_CONFIG: UnwantedSkillConfig = {
+  skillKeys: ["debuff_resistance", "healing_performance"],
+  updatedAt: "temporary",
 };
 
 function Dashboard() {
@@ -69,11 +103,13 @@ function Dashboard() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Loading artifacts...");
-  const artifactRows = artifacts.map((artifact) => ({
-    artifact,
-    review: reviewsByOwnedId[artifact.ownedId] ?? null,
-    presence: presenceByOwnedId[artifact.ownedId] ?? null,
-  }));
+  const artifactRows = artifacts.map((artifact) =>
+    buildArtifactScoreViewModel({
+      artifact,
+      review: reviewsByOwnedId[artifact.ownedId] ?? null,
+      presence: presenceByOwnedId[artifact.ownedId] ?? null,
+    }),
+  );
   const statistics = calculateArtifactStatistics({
     artifacts,
     userReviews: Object.values(reviewsByOwnedId),
@@ -675,6 +711,8 @@ function ArtifactControls({
             <option value="name:desc">Name descending</option>
             <option value="rating:asc">Rating ascending</option>
             <option value="rating:desc">Rating descending</option>
+            <option value="customScore:desc">Custom score descending</option>
+            <option value="customScore:asc">Custom score ascending</option>
           </select>
         </label>
       </div>
@@ -711,6 +749,7 @@ function ArtifactTable({
             <th>Kind</th>
             <th>Level</th>
             <th>Total score</th>
+            <th>Custom Score</th>
             <th>Rating</th>
             <th>Memo</th>
             <th>Last seen</th>
@@ -734,6 +773,9 @@ function ArtifactTable({
                   {artifact.level}/{artifact.maxLevel}
                 </td>
                 <td>{artifact.gameScore.total}</td>
+                <td>
+                  <CustomScoreCell score={row.customScore} />
+                </td>
                 <td>
                   <select
                     className="ratingSelect"
@@ -785,6 +827,16 @@ function ArtifactTable({
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function CustomScoreCell({ score }: { score: ScoreResult }) {
+  return (
+    <div className="customScoreCell" title={formatScoreReasonTitle(score)}>
+      <strong>{score.total}</strong>
+      <span>{score.selectedRoute}</span>
+      <small>{formatShortScoreReasons(score.reasons)}</small>
     </div>
   );
 }
@@ -907,9 +959,61 @@ function compareArtifacts(
     );
   }
 
+  if (sort.key === "customScore") {
+    return (
+      (left.customScore.total - right.customScore.total) * directionMultiplier
+    );
+  }
+
   return (
     left.artifact.name.localeCompare(right.artifact.name) * directionMultiplier
   );
+}
+
+function buildArtifactScoreViewModel(args: {
+  artifact: Artifact;
+  review: ArtifactUserReview | null;
+  presence: ArtifactPresence | null;
+}): ReviewedArtifactRow {
+  return {
+    ...args,
+    customScore: evaluateCustomScore({
+      artifact: args.artifact,
+      profile: TEMP_DEFAULT_SCORE_PROFILE,
+      unwantedSkillConfig: TEMP_UNWANTED_SKILL_CONFIG,
+    }),
+  };
+}
+
+function formatShortScoreReasons(reasons: ScoreReason[]): string {
+  const meaningfulReasons = reasons.filter((reason) => reason.delta !== 0);
+
+  if (meaningfulReasons.length === 0) {
+    return "-";
+  }
+
+  return meaningfulReasons
+    .slice(0, 2)
+    .map((reason) => reason.label)
+    .join(", ");
+}
+
+function formatScoreReasonTitle(score: ScoreResult): string {
+  if (score.reasons.length === 0) {
+    return `Route: ${score.selectedRoute}`;
+  }
+
+  return score.reasons
+    .map((reason) => `${formatSignedDelta(reason.delta)} ${reason.label}`)
+    .join("\n");
+}
+
+function formatSignedDelta(delta: number): string {
+  if (delta > 0) {
+    return `+${delta}`;
+  }
+
+  return String(delta);
 }
 
 function indexReviewsByOwnedId(

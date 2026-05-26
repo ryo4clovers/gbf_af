@@ -278,6 +278,33 @@ th {
   padding-left: 16px;
 }
 
+.customScoreCell {
+  display: grid;
+  gap: 2px;
+  min-width: 120px;
+}
+
+.customScoreCell strong {
+  font-size: 16px;
+}
+
+.customScoreCell span,
+.customScoreCell small {
+  color: #52616f;
+}
+
+.customScoreCell span {
+  font-size: 12px;
+}
+
+.customScoreCell small {
+  max-width: 220px;
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .skillList li + li {
   margin-top: 4px;
 }
