@@ -1,137 +1,234 @@
 # UI Design
 
-## 採用形式
+## 目的
 
-管理操作画面は Dedicated Page として実装する。
+GBF Artifact Tool の UI は、GBF のゲーム画面を変更せず、ローカルに保存したアーティファクト情報を確認・管理・評価するために提供する。
 
-```txt
-chrome-extension://<extension-id>/dashboard.html
-```
+UI は以下の2つを中心に構成する。
 
-Popup は補助操作、Dashboard は管理操作に分離する。
+- Side Panel
+- Dashboard
 
-## Popup
+Popup は Side Panel へ移行済みのため、現在の主要UIとしては扱わない。
+
+## UI 基本方針
+
+### 行うこと
+
+- Side Panel で現在の mode と scan / display 状態を確認する
+- Dashboard で保存済み artifact を管理する
+- rating / memo をローカルに保存する
+- statistics を表示する
+- CSV export を提供する
+- custom score の表示・設定を将来的に提供する
+
+### 行わないこと
+
+- GBF DOM を変更しない
+- GBF ページへ UI を挿入しない
+- GBF画面上にボタンやオーバーレイを追加しない
+- ゲーム画面をクリック・入力・遷移しない
+- Side Panel / Dashboard から GBF API request を送信しない
+- display mode で persistence / lifecycle update を行わない
+
+## UI 全体構成
+
+```text
+Chrome Extension UI
+├─ Side Panel
+│  ├─ Header
+│  ├─ Mode Controls
+│  ├─ Scan Panel
+│  ├─ Display Companion View
+│  └─ Dashboard Entry
+└─ Dashboard Page
+   ├─ Header
+   ├─ Summary / Statistics
+   ├─ Filter Bar
+   ├─ Artifact Table
+   ├─ Rating / Memo Editing
+   ├─ Lifecycle Filtering
+   ├─ CSV Export
+   └─ Future Custom Score Settings
+````
+
+## Side Panel
+
+Side Panel は拡張機能のメイン入口。
 
 ### 目的
 
-- 短時間の操作
-- 現在ページのスキャン
-- 管理画面への導線
-
-### 画面要素
-
-```txt
-Popup
-├─ Header
-│  └─ GBF Artifact Tool
-├─ Mode
-│  ├─ scan
-│  └─ manage
-├─ Scan Panel
-│  ├─ 現在ページをスキャン
-│  ├─ 現在ページ
-│  ├─ 最終ページ
-│  ├─ 取得済みページ
-│  └─ 最終スキャン日時
-└─ Actions
-   ├─ 管理画面を開く
-   └─ 保存データ確認
-```
-
-### Popup でやらないこと
-
-- 大量の一覧表示
-- 複雑なフィルタ
-- スコアルール編集
-- CSV カラム詳細設定
-
-## Dashboard
-
-### 目的
-
-管理操作の中心。
+* scan / manage / display の mode を切り替える
+* scan の開始・停止を行う
+* scan 状態を確認する
+* display mode の companion view を表示する
+* Dashboard を開く
 
 ### 画面構成
 
-```txt
-Dashboard
+```text
+Side Panel
 ├─ Header
-│  ├─ タイトル
-│  ├─ 最終スキャン日時
-│  ├─ 総件数
-│  └─ CSV出力
-├─ Summary Cards
-│  ├─ 総数
-│  ├─ ロック数
-│  ├─ 装備中
-│  ├─ keep
-│  ├─ trash
-│  └─ review
-├─ Filter Bar
-│  ├─ キーワード
-│  ├─ 属性
-│  ├─ 種類
-│  ├─ スキル名
-│  ├─ ロック状態
-│  ├─ 装備状態
-│  └─ ユーザーマーク
-├─ Artifact Table
-│  ├─ 基本情報
-│  ├─ スキル
-│  ├─ ゲーム内スコア
-│  ├─ 独自スコア
-│  └─ ユーザーマーク
-└─ Rule Panel
-   ├─ スコアルール一覧
-   ├─ ルール追加
-   ├─ ルール編集
-   └─ ルールインポート/エクスポート
+│  ├─ App Title
+│  └─ Current Mode
+├─ Mode Controls
+│  ├─ scan
+│  ├─ manage
+│  └─ display
+├─ Scan Panel
+│  ├─ Start Observing
+│  ├─ Stop Observing
+│  ├─ Current Page
+│  ├─ Last Page
+│  ├─ Total Count
+│  ├─ Observed Pages
+│  ├─ Last Observed At
+│  └─ Error Message
+├─ Display Panel
+│  ├─ Current Observed Page
+│  ├─ 5-column Artifact Grid
+│  ├─ Rating Display
+│  └─ Memo Tooltip
+└─ Actions
+   └─ Open Dashboard
 ```
 
-## Artifact Table カラム案
+## Side Panel: Mode Controls
 
-- Mark
-- Name
-- Attribute
-- Kind
-- Level
-- Locked
-- Equipped
-- Game Total Score
-- Custom Score
-- Skill 1
-- Skill 2
-- Skill 3
-- Skill 4
-- Actions
+### scan
 
-## Mark 操作
+scan mode は artifact list response の観測・保存を行う。
 
-```txt
-none   : 未判定
-keep   : 必要
-trash  : 不要候補
-review : 要確認
-```
+表示する情報:
+
+* observing state
+* current page
+* last page
+* total count
+* scanned pages
+* latest scan session status
+* latest error if any
+
+操作:
+
+* start observing
+* stop observing
 
 注意:
 
-- Mark はツール内だけの状態。
-- ゲーム内 `is_unnecessary` は変更しない。
-- ゲーム側状態とツール側判断を並べて表示する。
+* scan mode でのみ artifact persistence / lifecycle update を行う
+* GBFページの自動遷移は行わない
+* GBF APIへの独自requestは送信しない
 
-## UI 実装方針
+### manage
 
-初期実装ではシンプルな HTML + TypeScript でよい。
+manage mode は Dashboard への導線を提供する。
 
-React を使う場合は以下を守る。
+表示する情報:
 
-- 状態を局所化しすぎない
-- スコア計算や CSV 生成を React component に書かない
-- domain 層にロジックを分離する
-- 表示用 ViewModel を用意する
+* stored artifact count
+* latest scan metadata
+* dashboard open button
 
-## Dashboard 起動
+操作:
+
+* open dashboard
+
+注意:
+
+* manage mode 自体は Side Panel 内で大量一覧を表示しない
+* 一覧・フィルタ・CSV・詳細管理は Dashboard に集約する
+
+### display
+
+display mode は、GBF の現在表示中 artifact page に対応する companion view を表示する。
+
+表示する情報:
+
+* current observed page
+* current page artifact grid
+* rating
+* memo tooltip
+* display error if any
+
+操作:
+
+* start display mode
+* stop display mode
+
+注意:
+
+* display mode は persistence / lifecycle update を行わない
+* display mode は現在観測されたページの補助表示に限定する
+
+## Display Companion View
+
+### 目的
+
+GBF画面を見ながら、Side Panelで artifact の補助情報を確認できるようにする。
+
+GBF DOM は変更しない。
+
+### 表示内容
+
+```text
+Display Companion View
+├─ Current Page Info
+├─ Artifact Grid
+│  ├─ Artifact Card
+│  │  ├─ Name
+│  │  ├─ Attribute
+│  │  ├─ Kind
+│  │  ├─ Game Score
+│  │  ├─ Rating
+│  │  └─ Memo Tooltip
+│  └─ ...
+└─ Status / Error
+```
+
+### Grid
+
+* 5-column grid
+* 現在観測された GBF artifact page の artifact のみ表示
+* Dashboard の全件一覧とは役割を分ける
+
+### Rating Display
+
+* `ArtifactUserReview.rating` を表示する
+* display mode では編集を必須にしない
+* 編集導線を入れる場合も、artifact persistence / lifecycle update と混同しない
+
+### Memo Tooltip
+
+* `ArtifactUserReview.memo` がある場合に tooltip 表示する
+* memo が空の場合は非表示または empty state とする
+
+### 禁止
+
+* artifact persistence
+* scan session update
+* artifact presence update
+* GBF DOM mutation
+* GBF page navigation
+* GBF API request
+
+## Dashboard
+
+Dashboard は保存済み artifact の管理画面。
+
+### 目的
+
+* 保存済み artifact を一覧管理する
+* filter / sort する
+* rating / memo を編集する
+* lifecycle 状態を確認する
+* statistics を確認する
+* CSV export する
+* custom score を表示・設定する
+
+### 起動
+
+Dashboard は extension page として開く。
 
 ```ts
 chrome.tabs.create({
@@ -139,10 +236,758 @@ chrome.tabs.create({
 });
 ```
 
-## UX 方針
+### 画面構成
 
-- まず一覧が見える
-- フィルタは軽量
-- 重要な操作はローカル完結
-- 失敗時の理由を短く表示
-- 詳細ログは console に出す
+```text
+Dashboard
+├─ Header
+│  ├─ Title
+│  ├─ Stored Artifact Count
+│  ├─ Latest Scan Info
+│  └─ CSV Export
+├─ Summary Cards
+│  ├─ Total Count
+│  ├─ Active Count
+│  ├─ Possibly Deleted Count
+│  ├─ Locked Count
+│  ├─ Equipped Count
+│  ├─ Rating Distribution
+│  ├─ Attribute Distribution
+│  └─ Kind Distribution
+├─ Filter Bar
+│  ├─ Keyword
+│  ├─ Attribute
+│  ├─ Kind
+│  ├─ Skill Name
+│  ├─ Locked State
+│  ├─ Equipped State
+│  ├─ Rating
+│  ├─ Lifecycle Status
+│  ├─ Game Score
+│  └─ Future Custom Score
+├─ Artifact Table
+│  ├─ Basic Info
+│  ├─ Lifecycle
+│  ├─ Game Score
+│  ├─ Future Custom Score
+│  ├─ Skills
+│  ├─ Rating
+│  ├─ Memo
+│  └─ Actions
+└─ Future Custom Score Panel
+   ├─ Profile Selector
+   ├─ Ideal Skill Composition Editor
+   ├─ Skill Priority Editor
+   ├─ Unwanted Skill Editor
+   ├─ Score Preview
+   └─ Score Explanation
+```
+
+## Dashboard Header
+
+表示候補:
+
+* app title
+* stored artifact count
+* latest scanned at
+* latest scan session status
+* CSV export button
+* reload local data button
+
+注意:
+
+* reload は IndexedDB からの再読み込み
+* GBF API request を送る操作ではない
+
+## Summary / Statistics
+
+現在実装済みまたは想定する統計:
+
+* overall counts
+* rating distribution
+* attribute distribution
+* kind distribution
+* skill summary
+
+表示候補:
+
+```text
+Summary Cards
+├─ Total
+├─ Active
+├─ Possibly Deleted
+├─ Locked
+├─ Equipped
+├─ Rating 0
+├─ Rating 1
+├─ Rating 2
+├─ Rating 3
+├─ Rating 4
+└─ Rating 5
+```
+
+方針:
+
+* statistics は in-memory で計算する
+* 永続化しない
+* filter 適用後統計と全体統計を分ける場合はラベルで明示する
+
+## Filter Bar
+
+### 目的
+
+保存済み artifact を素早く絞り込む。
+
+### フィルタ候補
+
+```text
+Filter Bar
+├─ Keyword
+├─ Attribute
+├─ Kind
+├─ Skill Name
+├─ Locked State
+├─ Equipped State
+├─ Rating
+├─ Lifecycle Status
+├─ Game Total Score Range
+└─ Future Custom Score Range
+```
+
+### Keyword
+
+対象候補:
+
+* artifact name
+* skill name
+* memo
+* equipped character name
+
+### Attribute
+
+候補:
+
+* 火
+* 水
+* 土
+* 風
+* 光
+* 闇
+
+### Kind
+
+初期は raw label でよい。
+
+正式名称が判明したら置き換える。
+
+### Skill Name
+
+* raw skill name に対する部分一致
+* 将来的には normalized skill key / skill category filter も追加する
+
+### Lifecycle Status
+
+候補:
+
+* active
+* possiblyDeleted
+* all
+
+### Rating
+
+候補:
+
+* all
+* 0
+* 1
+* 2
+* 3
+* 4
+* 5
+
+## Sorting
+
+### ソート候補
+
+* ownedId
+* name
+* attribute
+* kind
+* level
+* gameScore.total
+* rating
+* scannedAt
+* lifecycle status
+* future custom score
+
+### 方針
+
+* sort key と sort direction を明示する
+* default sort は scannedAt desc または ownedId desc
+* custom score 実装後は selected profile の score で sort できるようにする
+
+## Artifact Table
+
+### 目的
+
+保存済み artifact を一覧で比較・管理する。
+
+### カラム候補
+
+```text
+Artifact Table
+├─ Rating
+├─ Memo
+├─ Lifecycle
+├─ Name
+├─ Attribute
+├─ Kind
+├─ Level
+├─ Locked
+├─ Equipped
+├─ Game Total Score
+├─ Custom Score
+├─ Skill 1
+├─ Skill 2
+├─ Skill 3
+├─ Skill 4
+└─ Actions
+```
+
+### Basic Info
+
+表示候補:
+
+* name
+* ownedId
+* artifactTypeId
+* attribute
+* kind
+* level / maxLevel
+* locked
+* equipped character
+
+### Game Score
+
+表示候補:
+
+* attack
+* defense
+* special
+* total
+
+注意:
+
+* game score と custom score を混同しない
+* `Game Total Score` と `Custom Score` は別カラムにする
+
+### Skills
+
+各 skill に表示する内容:
+
+* slot
+* name
+* level
+* quality
+* effect value
+* score category
+* future table rank
+* future normalized key
+
+表示例:
+
+```text
+S1 自属性攻撃力 Lv1 q3 +10.4%
+S2 回復性能 Lv1 q1 +13.2%
+S3 最大HP上昇/防御力-70% Lv1 q1 +8.8%
+S4 回復アビリティ使用時... q1 4%
+```
+
+### Rating
+
+* 0〜5
+* UIは星、select、button group のいずれでもよい
+* 初期は単純な select / buttons で十分
+
+### Memo
+
+* 短い memo を inline 表示
+* 長文は tooltip または expandable display
+* 編集は modal / inline editor / textarea のいずれでもよい
+
+### Lifecycle
+
+表示候補:
+
+* active
+* possiblyDeleted
+* firstSeenAt
+* lastSeenAt
+
+`possiblyDeleted` は削除確定ではなく、full scan 後に観測されなかった状態として表示する。
+
+## Rating / Memo Editing
+
+### Rating
+
+要件:
+
+* 0〜5 を設定できる
+* 保存後、Dashboard / Display Mode に反映される
+* 再スキャン後も維持される
+
+### Memo
+
+要件:
+
+* 任意文字列を保存できる
+* artifact 本体とは分離して保存する
+* 再スキャン後も維持される
+* display mode で tooltip 表示できる
+
+### 保存方針
+
+* `ArtifactUserReview` として保存する
+* `ownedId` で紐付ける
+* artifact persistence と分離する
+
+## CSV Export UI
+
+### 目的
+
+保存済み artifact をローカル CSV として出力する。
+
+### UI
+
+```text
+CSV Export
+├─ Export Button
+├─ Optional Column Settings
+└─ Export Status
+```
+
+初期は単一ボタンで十分。
+
+### 出力候補
+
+* basic artifact info
+* lifecycle status
+* rating
+* memo
+* game score
+* future custom score
+* skill 1〜4
+
+### 禁止
+
+* 外部サーバーへ送信しない
+* GBF API request を送らない
+
+## Custom Score UI
+
+Custom Score は次に実装予定の主要機能。
+
+Phase 1 では自由数式エディタを作らない。
+
+### 目的
+
+ユーザーが artifact 選別時に考えている以下の判断を、ローカル score として表現する。
+
+* 欲しいスキルの組み合わせに近いか
+* 強いスキルを持っているか
+* 不要スキルがあるか
+* 効果量テーブルが高いか
+
+### UI 全体
+
+```text
+Custom Score Panel
+├─ Score Profile Selector
+├─ Ideal Skill Composition Editor
+├─ Skill Priority Editor
+├─ Unwanted Skill Editor
+├─ Score Preview
+└─ Score Explanation
+```
+
+### Score Profile Selector
+
+表示:
+
+* current profile name
+* profile list
+* create profile
+* rename profile
+* duplicate profile
+* delete profile
+
+Phase 1 では profile 数を絞ってもよい。
+
+### Ideal Skill Composition Editor
+
+目的:
+
+理想スキル構成を設定する。
+
+仕様:
+
+* 最大4スキル
+* slot position は見ない
+* normalized skill key ベースで選択する
+* 1/4, 2/4, 3/4, 4/4 match の説明を表示する
+
+UI候補:
+
+```text
+Ideal Skill Composition
+├─ Skill Select 1
+├─ Skill Select 2
+├─ Skill Select 3
+└─ Skill Select 4
+```
+
+または:
+
+```text
+Ideal Skill Composition
+├─ Selected Skill Chips
+└─ Add Skill
+```
+
+注意:
+
+* slot番号を強調しない
+* 「順番は評価に影響しない」と明示するとよい
+
+### Skill Priority Editor
+
+目的:
+
+強い / 使用頻度が高いスキルの序列を設定する。
+
+UI候補:
+
+* drag and drop
+* up / down buttons
+* rank number display
+
+初期実装では、drag and drop より up / down buttons の方が実装・デバッグしやすい。
+
+表示例:
+
+```text
+Skill Priority
+1. 通常攻撃ダメージ上限
+2. 自属性攻撃力
+3. トリプルアタック確率
+4. 攻撃力
+```
+
+方針:
+
+* ユーザーに直接点数入力を要求しない
+* rank から内部 score weight を計算する
+* 将来、advanced mode で数値調整を追加してもよい
+
+### Unwanted Skill Editor
+
+目的:
+
+不要スキルを設定する。
+
+仕様:
+
+* Phase 1 では global config
+* profile ごとには変えない
+* priority route で減点に使う
+* ideal route では重視しすぎない
+
+UI候補:
+
+* checkbox list
+* multi-select
+* selected skill chips
+
+説明文の例:
+
+```text
+不要スキルは、単体スキル評価ルートで減点されます。
+理想構成に近いAFは、不要スキルが1つあっても高評価になる場合があります。
+```
+
+### Score Preview
+
+目的:
+
+設定中の profile が artifact にどう効くか確認する。
+
+表示候補:
+
+* selected artifact
+* final score
+* selected route
+* ideal route score
+* priority route score
+* top reasons
+
+例:
+
+```text
+Score: 87
+Route: ideal
+Ideal Route: 87
+Priority Route: 61
+```
+
+### Score Explanation
+
+目的:
+
+なぜその score になったのかを説明する。
+
+表示例:
+
+```text
++ 3/4 ideal match
++ 通常攻撃ダメージ上限 rank e
++ 自属性攻撃力 rank d
+```
+
+または:
+
+```text
++ 通常攻撃ダメージ上限 rank e
++ 自属性攻撃力 rank d
+- 不要スキル 1件
+```
+
+方針:
+
+* score reason は UI表示に耐える構造で返す
+* debug用 raw detail と user-facing label を分けてもよい
+* game score とは別表示にする
+
+## Custom Score Display in Dashboard
+
+Custom Score 実装後、Dashboard に以下を追加する。
+
+### Header / Controls
+
+* selected score profile
+* recalculate scores action if needed
+* score settings button
+
+### Artifact Table
+
+追加カラム:
+
+* custom score
+* selected route
+* score reason summary
+
+### Filter
+
+追加候補:
+
+* custom score range
+* selected route
+* has ideal match count
+* contains unwanted skill
+
+### Sort
+
+追加候補:
+
+* custom score desc
+* ideal route score desc
+* priority route score desc
+
+## Empty States
+
+### No Stored Artifacts
+
+表示例:
+
+```text
+No artifacts stored yet.
+Start scan mode and manually open artifact pages in GBF.
+The extension will observe GBF page responses.
+```
+
+### No Review Metadata
+
+表示例:
+
+```text
+No rating or memo yet.
+Add rating or memo from the Dashboard.
+```
+
+### No Display Data
+
+表示例:
+
+```text
+No artifact page observed yet.
+Start display mode and open an artifact page in GBF.
+```
+
+### No Score Profile
+
+表示例:
+
+```text
+No score profile yet.
+Create a profile by selecting ideal skills, skill priority, and unwanted skills.
+```
+
+## Error Display
+
+### 方針
+
+* ユーザー向けには短く表示する
+* 詳細は console に出す
+* recovery action がある場合は明示する
+
+### エラー例
+
+#### Not on GBF page
+
+```text
+Open a GBF page before starting observation.
+```
+
+#### Content Bridge Unavailable
+
+```text
+Could not connect to the GBF page. Reload the GBF tab and try again.
+```
+
+#### Observer Injection Failed
+
+```text
+Could not start artifact response observation.
+```
+
+#### Validation Failed
+
+```text
+Observed artifact response was not in the expected format.
+```
+
+#### IndexedDB Error
+
+```text
+Could not save local artifact data.
+```
+
+## Loading States
+
+### Side Panel
+
+* checking current state
+* starting observation
+* stopping observation
+* loading stored count
+* loading display data
+
+### Dashboard
+
+* loading artifacts
+* loading reviews
+* calculating statistics
+* exporting CSV
+* future calculating custom scores
+
+## Accessibility / Usability
+
+方針:
+
+* 重要な状態は色だけで表現しない
+* button text を明確にする
+* error message は短く具体的にする
+* table は横スクロールを許容する
+* rating は keyboard 操作でも変更できる構成が望ましい
+* memo は長文でも壊れない表示にする
+
+## Implementation Guidance
+
+### React Components
+
+UI component に business logic を詰め込みすぎない。
+
+避けること:
+
+* component 内で score calculation を直接実装する
+* component 内で CSV文字列を直接組み立てる
+* component 内で IndexedDB を直接扱う
+* component 内で normalization を行う
+
+推奨:
+
+```text
+UI Component
+-> ViewModel / hook
+-> message / storage adapter
+-> domain pure function
+```
+
+### Side Panel Components
+
+候補:
+
+```text
+src/sidepanel/
+  index.tsx
+  style.css
+
+src/panel/
+  ExtensionPanel.tsx
+  ModeControls.tsx
+  ScanPanel.tsx
+  DisplayPanel.tsx
+  DashboardEntry.tsx
+```
+
+### Dashboard Components
+
+候補:
+
+```text
+src/dashboard/
+  index.tsx
+  Dashboard.tsx
+  ArtifactTable.tsx
+  ArtifactFilters.tsx
+  ArtifactSummary.tsx
+  CsvExportButton.tsx
+  ReviewEditor.tsx
+  LifecycleBadge.tsx
+```
+
+### Future Custom Score Components
+
+候補:
+
+```text
+src/dashboard/score/
+  ScoreProfileSelector.tsx
+  IdealSkillCompositionEditor.tsx
+  SkillPriorityEditor.tsx
+  UnwantedSkillEditor.tsx
+  ScorePreview.tsx
+  ScoreExplanation.tsx
+```
+
+## UI Safety Checklist
+
+UI変更時は以下を確認する。
+
+* GBF DOM を変更していないか
+* GBFページへUIを挿入していないか
+* GBF API request を送信していないか
+* page navigation を発生させていないか
+* display mode で persistence / lifecycle update をしていないか
+* scan / manage / display の責務が混ざっていないか
+* game score と custom score を混同していないか
+* rating / memo が再スキャンで消えない設計になっているか

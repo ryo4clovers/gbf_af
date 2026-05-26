@@ -1,67 +1,355 @@
 # GBF Artifact Tool
 
-Granblue Fantasy のアーティファクト管理を目的とした Chrome Extension プロジェクトです。
+Granblue Fantasy のアーティファクト(AF)管理を目的とした Chrome Extension プロジェクトです。
 
-## 目的
+この拡張機能は、GBF の画面やゲーム進行を操作せず、GBF ページ自身が取得したアーティファクト一覧レスポンスを観測し、ローカルで管理・評価・表示するための補助ツールです。
 
-ゲーム内のアーティファクト一覧を読み取り、ローカルで以下を行います。
+## 重要な方針
 
-- アーティファクト一覧管理
-- スコアルール設定
-- 独自スコア計算
-- 必要 / 不要チェック
-- CSV 出力
-
-## 重要な制約
-
-このツールは読み取り専用の補助ツールです。
+このツールは observation-only の補助ツールです。
 
 禁止事項:
 
 - ゲーム画面を操作しない
-- ゲーム画面の UI を変更しない
-- 自動周回、自動売却、自動強化などを行わない
-- POST / PUT / DELETE など状態変更系リクエストを行わない
+- GBF DOM を変更しない
+- GBF API に対して拡張機能独自のリクエストを送信しない
+- 自動周回、自動売却、自動強化、自動ページ遷移などを行わない
+- POST / PUT / DELETE など、ゲーム状態を変更する通信を行わない
 - 外部サーバーへユーザーデータを送信しない
 
-## 採用方針
+許可されること:
+
+- GBF ページ自身が発行した `/rest/artifact/list/{page}` のレスポンスを観測する
+- 観測したレスポンスを content bridge 経由で background service worker に渡す
+- 正規化したアーティファクト情報を IndexedDB に保存する
+- ローカルデータを Side Panel / Dashboard で表示、検索、並び替え、CSV出力する
+- ユーザが付与した rating / memo / 将来の custom score profile をローカル保存する
+
+## 現在の構成
 
 - Chrome Extension Manifest V3
+- React
 - TypeScript
 - Vite
-- React
 - Zustand
-- API 取得方式
-- Popup + Dedicated Dashboard Page 構成
-- ローカル保存中心
-- 過度な抽象化を避ける
+- Zod
+- IndexedDB
+- Chrome Side Panel
+- Dashboard page
+- Biome
 
 ## 画面構成
 
-- Popup
-  - スキャンモード / 管理モード切替
-  - 現在ページのスキャン
-  - 管理画面を開く
-- Dashboard
-  - アーティファクト一覧
-  - フィルタ
-  - スコアルール設定
-  - 必要 / 不要チェック
-  - CSV 出力
+### Side Panel
 
-詳細は `docs/` 配下を参照してください。
+拡張機能のメイン入口です。
 
-## セットアップ
+- mode controls
+- scan controls / scan status
+- display companion view
+- dashboard open action
+
+Popup は現在使用していません。
+
+### Dashboard
+
+ローカルに保存されたアーティファクトを管理する画面です。
+
+- アーティファクト一覧
+- フィルタ
+- ソート
+- CSV export
+- statistics summary
+- rating
+- memo
+- lifecycle filtering
+
+## モード
+
+このツールには明示的な3つのモードがあります。
+
+### scan
+
+GBFページ自身の通信を観測し、アーティファクト一覧を収集します。
+
+主な責務:
+
+- `/rest/artifact/list/{page}` の観測
+- scan session lifecycle 管理
+- artifact presence 更新
+- full scan 完了後の possiblyDeleted 判定
+- legacy ArtifactPresence backfill
+
+### manage
+
+保存済みアーティファクトを管理します。
+
+主な責務:
+
+- dashboard での一覧表示
+- rating / memo 編集
+- filter / sort
+- statistics
+- CSV export
+- lifecycle 状態確認
+
+### display
+
+GBF の現在表示中アーティファクトページに対応する Side Panel companion view です。
+
+主な責務:
+
+- 現在観測された GBF artifact page の表示
+- 5-column grid 表示
+- rating 表示
+- memo tooltip 表示
+
+display mode では、artifact persistence / lifecycle update は行いません。
+
+## データ取得フロー
+
+Artifact data source:
+
+```text
+GBF page network response
+/rest/artifact/list/{page}
+````
+
+Observation flow:
+
+```text
+page-context fetch/XHR observer
+-> content bridge
+-> background service worker
+-> IndexedDB persistence
+```
+
+この拡張機能は、GBF API に対して独自に artifact list request を送信しません。
+
+## データ分離方針
+
+Artifact 本体、lifecycle、user review metadata は分離して扱います。
+
+主なモデル:
+
+* `Artifact`
+* `ArtifactPresence`
+* `ScanSession`
+* `ArtifactUserReview`
+* `DisplayState`
+
+Review metadata:
+
+* `rating: 0-5`
+* `memo`
+
+Review metadata は再スキャン後も維持されます。
+
+## IndexedDB
+
+現在の主な store:
+
+* `artifacts`
+* `scanMetadata`
+* `artifactUserReviews`
+* `scanSessions`
+* `artifactPresence`
+
+統計情報は IndexedDB に保存せず、Dashboard 表示時に in-memory で計算します。
+
+## Statistics
+
+現在実装済み:
+
+* overall counts
+* rating distribution
+* attribute distribution
+* kind distribution
+* skill summary
+
+## Content Bridge Stability
+
+extension reload や stale content script に備えて、content bridge は再注入可能な設計です。
+
+実装済みの考え方:
+
+* `ensureContentBridge(tabId)`
+* `PING_CONTENT_BRIDGE`
+* idempotent content bridge injection
+* stale content-script recovery after extension reload
+
+## Custom Score System
+
+次に実装予定の主要機能です。
+
+### 目的
+
+ユーザがアーティファクトを選別する際の思考を、ローカルな custom score として表現します。
+
+評価観点:
+
+* 欲しいスキルの組み合わせにどれだけ近いか
+* 使用頻度の高い、または強いスキルを持っているか
+* 不要スキルを持っているか
+* 同じスキルでも効果量テーブルが高いか
+
+### 前提
+
+Phase 1 では、完全な自由数式エディタは作りません。
+
+まずは、ユーザが以下を設定できる rule/profile based scoring を実装します。
+
+* 理想スキル構成
+* スキル序列
+* 不要スキル
+
+### スコア評価方針
+
+最終スコアは、次の2つの評価ルートのうち高い方を採用します。
+
+```text
+finalScore =
+  max(
+    idealRouteScore,
+    priorityRouteScore
+  )
+```
+
+#### idealRouteScore
+
+理想構成にどれだけ近いかを評価します。
+
+```text
+idealRouteScore =
+  理想構成一致スコア
+  + 理想構成に含まれるスキルの効果量補正
+```
+
+一致判定:
+
+* 1/4 一致
+* 2/4 一致
+* 3/4 一致
+* 4/4 一致
+
+スロット位置は見ません。
+
+理由:
+
+* ユーザは「第何スキルにあるか」よりも、欲しい構成に近いかを重視する
+* 不要スキルが1個であれば、ゲーム内アイテムで別スキルに変更可能
+* そのため、理想構成評価では不要スキル減点を重く扱わない
+
+#### priorityRouteScore
+
+個々のスキル価値を評価します。
+
+```text
+priorityRouteScore =
+  スキル序列スコア
+  + 効果量補正
+  - 不要スキル減点
+```
+
+不要スキル:
+
+* 1つあれば大きく減点
+* 複数あるほど段階的に減点
+* profile ごとには変えず、共通設定として扱う
+
+#### 効果量テーブル補正
+
+アーティファクトの第1〜第3スキルの多くは、同じ skill level でも a〜e の効果量テーブル差があります。
+
+基本方針:
+
+* e を最も高く評価する
+* ただし「欲しいスキルの d」は「微妙なスキルの e」より高くなるべき
+* そのため、効果量補正は独立加点ではなく、スキル基礎点に対する倍率補正として扱う
+
+例:
+
+```text
+important skill d: 30 * 1.15 = 34.5
+minor skill e:     10 * 1.25 = 12.5
+```
+
+#### Lv評価
+
+スキルレベルはリセット可能なため、Phase 1 の custom score は Lv1 想定で評価します。
+
+現在のAFレベルや現在のskill levelをそのまま将来価値と混ぜないようにします。
+
+### 将来フェーズ
+
+#### Phase 1
+
+* rule/profile based scoring
+* ideal skill set
+* skill priority
+* unwanted skills
+* table rank multiplier
+* score explanation
+
+#### Phase 2
+
+* preset score profiles
+
+  * normal attack
+  * ougi
+  * ability damage
+  * defense
+  * general use
+
+#### Phase 3
+
+* advanced/custom formula editor
+* import/export score profiles
+* more detailed skill categorization
+
+## Custom Score 実装方針
+
+Custom score は、Artifact本体へ永続的に焼き込まない方針を優先します。
+
+理由:
+
+* score profile は後から変わる
+* スコア算出ロジックも調整される
+* artifact data と user scoring policy を分離した方が保守しやすい
+* 複数 profile による比較がしやすい
+
+推奨される責務分離:
+
+```text
+Artifact
+-> observed normalized data
+
+ScoreProfile
+-> user-defined scoring policy
+
+ScoreEvaluator
+-> pure evaluation logic
+
+ScoreResult
+-> calculated result for UI
+```
+
+## 開発セットアップ
 
 ```bash
 npm install
-npm run build
 ```
 
-開発中の確認:
+開発:
 
 ```bash
 npm run dev
+```
+
+build:
+
+```bash
+npm run build
 ```
 
 品質チェック:
@@ -83,15 +371,13 @@ npm run format
 3. Developer mode を有効にする
 4. Load unpacked で `dist/` を選択する
 
-## 現在の実装範囲
+## 開発時の注意
 
-- MV3 manifest
-- Popup page
-- Dashboard page
-- Background service worker
-- Content script
-- Runtime message skeleton
-- Artifact API / internal model type definitions
-- Placeholder scan / manage mode state
+このプロジェクトでは、機能追加時に以下を必ず確認してください。
 
-スキャン処理はまだ API 取得を行いません。現時点の `Scan Current Page` は通信経路確認用のプレースホルダーで、ゲーム画面の操作、DOM 変更、外部送信は行いません。
+* GBF DOM を変更していないか
+* GBF API へ独自リクエストを送っていないか
+* page navigation を発生させていないか
+* polling / retry によってゲーム側通信を増やしていないか
+* scan / manage / display mode の責務が混ざっていないか
+* Artifact / lifecycle / user review / scoring policy のデータ分離を壊していないか
