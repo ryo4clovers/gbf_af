@@ -6,6 +6,12 @@ export type SkillCatalogEntry = {
   category: SkillCategory;
 };
 
+export type SkillCatalogOption = {
+  key: NormalizedSkillKey;
+  label: string;
+  category: SkillCategory;
+};
+
 const attackPower: SkillCatalogEntry = {
   normalizedKey: "attack_power",
   label: "攻撃力",
@@ -168,4 +174,24 @@ export function getSkillCatalogEntry(
   skillId: number,
 ): SkillCatalogEntry | undefined {
   return SKILL_CATALOG_BY_ID[skillId];
+}
+
+export function getSkillCatalogOptions(): SkillCatalogOption[] {
+  const optionsByKey: Record<NormalizedSkillKey, SkillCatalogOption> = {};
+
+  for (const entry of Object.values(SKILL_CATALOG_BY_ID)) {
+    if (optionsByKey[entry.normalizedKey] !== undefined) {
+      continue;
+    }
+
+    optionsByKey[entry.normalizedKey] = {
+      key: entry.normalizedKey,
+      label: entry.label,
+      category: entry.category,
+    };
+  }
+
+  return Object.values(optionsByKey).sort((left, right) =>
+    left.label.localeCompare(right.label, "ja"),
+  );
 }

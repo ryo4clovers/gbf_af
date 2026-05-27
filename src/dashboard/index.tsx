@@ -15,6 +15,10 @@ import {
   type UnwantedSkillConfig,
 } from "../domain/score/scoreProfile";
 import type { ScoreReason, ScoreResult } from "../domain/score/scoreResult";
+import {
+  getSkillCatalogOptions,
+  type SkillCatalogOption,
+} from "../domain/skill/skillCatalog";
 import { sendRuntimeMessage } from "../shared/chromeMessages";
 import { useAppStore } from "../state/appState";
 import {
@@ -62,6 +66,8 @@ type ReviewedArtifactRow = {
   customScore: ScoreResult;
 };
 
+const skillCatalogOptions = getSkillCatalogOptions();
+
 function Dashboard() {
   const { mode, scan, setMode, setScanState } = useAppStore();
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
@@ -83,6 +89,12 @@ function Dashboard() {
     null,
   );
   const [newScoreProfileName, setNewScoreProfileName] = useState("");
+  const [selectedIdealSkillKey, setSelectedIdealSkillKey] = useState("");
+  const [idealSkillError, setIdealSkillError] = useState<string | null>(null);
+  const [selectedUnwantedSkillKey, setSelectedUnwantedSkillKey] = useState("");
+  const [unwantedSkillError, setUnwantedSkillError] = useState<string | null>(
+    null,
+  );
   const [filters, setFilters] = useState<ArtifactFilters>(initialFilters);
   const [sort, setSort] = useState<ArtifactSort>({
     key: "totalScore",
@@ -380,6 +392,130 @@ function Dashboard() {
     await saveSelectedScoreProfile(fallbackProfile.id);
   };
 
+  const saveIdealSkillProfile = async (
+    profile: ScoreProfile,
+  ): Promise<boolean> => {
+    setIdealSkillError(null);
+
+    const response = await sendRuntimeMessage({
+      type: "SAVE_SCORE_PROFILE",
+      profile,
+    });
+
+    if (!response.ok) {
+      setIdealSkillError("Could not save ideal skills.");
+      return false;
+    }
+
+    if (response.type === "SAVE_SCORE_PROFILE_RESULT") {
+      setScoreProfiles((current) =>
+        replaceScoreProfile(current, response.profile),
+      );
+    }
+
+    return true;
+  };
+
+  const addIdealSkill = async () => {
+    if (selectedIdealSkillKey.length === 0) {
+      setIdealSkillError("Select a skill to add.");
+      return;
+    }
+
+    if (activeScoreProfile.idealSkillKeys.includes(selectedIdealSkillKey)) {
+      setIdealSkillError("This skill is already selected.");
+      return;
+    }
+
+    if (activeScoreProfile.idealSkillKeys.length >= 4) {
+      setIdealSkillError("Ideal skills can contain up to 4 skills.");
+      return;
+    }
+
+    const nextProfile: ScoreProfile = {
+      ...activeScoreProfile,
+      idealSkillKeys: [
+        ...activeScoreProfile.idealSkillKeys,
+        selectedIdealSkillKey,
+      ],
+      updatedAt: new Date().toISOString(),
+    };
+
+    const didSave = await saveIdealSkillProfile(nextProfile);
+
+    if (didSave) {
+      setSelectedIdealSkillKey("");
+    }
+  };
+
+  const removeIdealSkill = async (skillKey: string) => {
+    const nextProfile: ScoreProfile = {
+      ...activeScoreProfile,
+      idealSkillKeys: activeScoreProfile.idealSkillKeys.filter(
+        (currentSkillKey) => currentSkillKey !== skillKey,
+      ),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await saveIdealSkillProfile(nextProfile);
+  };
+
+  const saveUnwantedSkills = async (
+    config: UnwantedSkillConfig,
+  ): Promise<boolean> => {
+    setUnwantedSkillError(null);
+
+    const response = await sendRuntimeMessage({
+      type: "SAVE_UNWANTED_SKILL_CONFIG",
+      config,
+    });
+
+    if (!response.ok) {
+      setUnwantedSkillError("Could not save unwanted skills.");
+      return false;
+    }
+
+    if (response.type === "SAVE_UNWANTED_SKILL_CONFIG_RESULT") {
+      setUnwantedSkillConfig(response.config);
+    }
+
+    return true;
+  };
+
+  const addUnwantedSkill = async () => {
+    if (selectedUnwantedSkillKey.length === 0) {
+      setUnwantedSkillError("Select a skill to add.");
+      return;
+    }
+
+    if (unwantedSkillConfig.skillKeys.includes(selectedUnwantedSkillKey)) {
+      setUnwantedSkillError("This skill is already selected.");
+      return;
+    }
+
+    const nextConfig: UnwantedSkillConfig = {
+      skillKeys: [...unwantedSkillConfig.skillKeys, selectedUnwantedSkillKey],
+      updatedAt: new Date().toISOString(),
+    };
+
+    const didSave = await saveUnwantedSkills(nextConfig);
+
+    if (didSave) {
+      setSelectedUnwantedSkillKey("");
+    }
+  };
+
+  const removeUnwantedSkill = async (skillKey: string) => {
+    const nextConfig: UnwantedSkillConfig = {
+      skillKeys: unwantedSkillConfig.skillKeys.filter(
+        (currentSkillKey) => currentSkillKey !== skillKey,
+      ),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await saveUnwantedSkills(nextConfig);
+  };
+
   const updateMemoDraft = (ownedId: number, memo: string) => {
     setReviewsByOwnedId((current) => {
       const currentReview = current[ownedId];
@@ -463,6 +599,24 @@ function Dashboard() {
             onDeleteProfile={deleteActiveScoreProfile}
             onNewProfileNameChange={setNewScoreProfileName}
             onProfileChange={saveSelectedScoreProfile}
+          />
+          <IdealSkillEditor
+            errorMessage={idealSkillError}
+            idealSkillKeys={activeScoreProfile.idealSkillKeys}
+            onAddSkill={addIdealSkill}
+            onRemoveSkill={removeIdealSkill}
+            onSelectedSkillChange={setSelectedIdealSkillKey}
+            options={skillCatalogOptions}
+            selectedSkillKey={selectedIdealSkillKey}
+          />
+          <UnwantedSkillEditor
+            errorMessage={unwantedSkillError}
+            onAddSkill={addUnwantedSkill}
+            onRemoveSkill={removeUnwantedSkill}
+            onSelectedSkillChange={setSelectedUnwantedSkillKey}
+            options={skillCatalogOptions}
+            selectedSkillKey={selectedUnwantedSkillKey}
+            unwantedSkillKeys={unwantedSkillConfig.skillKeys}
           />
 
           <ArtifactControls
@@ -638,6 +792,132 @@ function CustomScoreProfileSummary({
         </button>
       </div>
       {errorMessage !== null && <p>{errorMessage}</p>}
+    </section>
+  );
+}
+
+function IdealSkillEditor({
+  errorMessage,
+  idealSkillKeys,
+  onAddSkill,
+  onRemoveSkill,
+  onSelectedSkillChange,
+  options,
+  selectedSkillKey,
+}: {
+  errorMessage: string | null;
+  idealSkillKeys: string[];
+  onAddSkill: () => void;
+  onRemoveSkill: (skillKey: string) => void;
+  onSelectedSkillChange: (skillKey: string) => void;
+  options: SkillCatalogOption[];
+  selectedSkillKey: string;
+}) {
+  return (
+    <section className="idealSkillEditor" aria-label="Ideal skills">
+      <h3>Ideal Skills</h3>
+      {idealSkillKeys.length === 0 ? (
+        <p className="mutedText">No ideal skills selected.</p>
+      ) : (
+        <div className="scoreSkillChips">
+          {idealSkillKeys.map((skillKey) => (
+            <button
+              className="scoreSkillChip"
+              key={skillKey}
+              type="button"
+              onClick={() => onRemoveSkill(skillKey)}
+              title="Remove ideal skill"
+            >
+              {getSkillOptionLabel(skillKey, options)} x
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="scoreProfileRow">
+        <label>
+          Add ideal skill
+          <select
+            value={selectedSkillKey}
+            onChange={(event) =>
+              onSelectedSkillChange(event.currentTarget.value)
+            }
+          >
+            <option value="">Select skill</option>
+            {options.map((option) => (
+              <option key={option.key} value={option.key}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="button" onClick={onAddSkill}>
+          Add
+        </button>
+      </div>
+      {errorMessage !== null && <p className="errorText">{errorMessage}</p>}
+    </section>
+  );
+}
+
+function UnwantedSkillEditor({
+  errorMessage,
+  onAddSkill,
+  onRemoveSkill,
+  onSelectedSkillChange,
+  options,
+  selectedSkillKey,
+  unwantedSkillKeys,
+}: {
+  errorMessage: string | null;
+  onAddSkill: () => void;
+  onRemoveSkill: (skillKey: string) => void;
+  onSelectedSkillChange: (skillKey: string) => void;
+  options: SkillCatalogOption[];
+  selectedSkillKey: string;
+  unwantedSkillKeys: string[];
+}) {
+  return (
+    <section className="unwantedSkillEditor" aria-label="Unwanted skills">
+      <h3>Unwanted Skills</h3>
+      {unwantedSkillKeys.length === 0 ? (
+        <p className="mutedText">No unwanted skills selected.</p>
+      ) : (
+        <div className="scoreSkillChips">
+          {unwantedSkillKeys.map((skillKey) => (
+            <button
+              className="scoreSkillChip"
+              key={skillKey}
+              type="button"
+              onClick={() => onRemoveSkill(skillKey)}
+              title="Remove unwanted skill"
+            >
+              {getSkillOptionLabel(skillKey, options)} x
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="scoreProfileRow">
+        <label>
+          Add unwanted skill
+          <select
+            value={selectedSkillKey}
+            onChange={(event) =>
+              onSelectedSkillChange(event.currentTarget.value)
+            }
+          >
+            <option value="">Select skill</option>
+            {options.map((option) => (
+              <option key={option.key} value={option.key}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="button" onClick={onAddSkill}>
+          Add
+        </button>
+      </div>
+      {errorMessage !== null && <p className="errorText">{errorMessage}</p>}
     </section>
   );
 }
@@ -1217,6 +1497,30 @@ function getActiveScoreProfile(
   );
 
   return selectedProfile ?? scoreProfiles[0] ?? DEFAULT_SCORE_PROFILE;
+}
+
+function replaceScoreProfile(
+  profiles: ScoreProfile[],
+  profile: ScoreProfile,
+): ScoreProfile[] {
+  const replacedProfiles = profiles.map((currentProfile) =>
+    currentProfile.id === profile.id ? profile : currentProfile,
+  );
+
+  if (
+    replacedProfiles.some((currentProfile) => currentProfile.id === profile.id)
+  ) {
+    return replacedProfiles;
+  }
+
+  return [...replacedProfiles, profile];
+}
+
+function getSkillOptionLabel(
+  skillKey: string,
+  options: SkillCatalogOption[],
+): string {
+  return options.find((option) => option.key === skillKey)?.label ?? skillKey;
 }
 
 function formatShortScoreReasons(reasons: ScoreReason[]): string {

@@ -207,6 +207,56 @@ select {
   color: #b42318;
 }
 
+.idealSkillEditor,
+.unwantedSkillEditor {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  border-top: 1px solid #eef2f6;
+  padding-top: 12px;
+  color: #52616f;
+  font-size: 13px;
+}
+
+.idealSkillEditor h3,
+.unwantedSkillEditor h3 {
+  margin: 0;
+  color: #1f2933;
+  font-size: 14px;
+}
+
+.idealSkillEditor label,
+.unwantedSkillEditor label {
+  display: grid;
+  gap: 6px;
+  max-width: 280px;
+  min-width: 220px;
+}
+
+.scoreSkillChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.scoreSkillChip {
+  border-color: #d8dee8;
+  padding: 5px 8px;
+  color: #1f2933;
+  font-size: 12px;
+  background: #fafbfc;
+}
+
+.mutedText {
+  margin: 0;
+  color: #697586;
+}
+
+.errorText {
+  margin: 0;
+  color: #b42318;
+}
+
 .summaryCards {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
