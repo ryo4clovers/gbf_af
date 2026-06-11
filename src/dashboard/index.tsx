@@ -91,6 +91,10 @@ function Dashboard() {
   const [newScoreProfileName, setNewScoreProfileName] = useState("");
   const [selectedIdealSkillKey, setSelectedIdealSkillKey] = useState("");
   const [idealSkillError, setIdealSkillError] = useState<string | null>(null);
+  const [selectedPrioritySkillKey, setSelectedPrioritySkillKey] = useState("");
+  const [prioritySkillError, setPrioritySkillError] = useState<string | null>(
+    null,
+  );
   const [selectedUnwantedSkillKey, setSelectedUnwantedSkillKey] = useState("");
   const [unwantedSkillError, setUnwantedSkillError] = useState<string | null>(
     null,
@@ -460,6 +464,117 @@ function Dashboard() {
     await saveIdealSkillProfile(nextProfile);
   };
 
+  const saveSkillPriorityProfile = async (
+    profile: ScoreProfile,
+  ): Promise<boolean> => {
+    setPrioritySkillError(null);
+
+    const response = await sendRuntimeMessage({
+      type: "SAVE_SCORE_PROFILE",
+      profile,
+    });
+
+    if (!response.ok) {
+      setPrioritySkillError("Could not save skill priority.");
+      return false;
+    }
+
+    if (response.type === "SAVE_SCORE_PROFILE_RESULT") {
+      setScoreProfiles((current) =>
+        replaceScoreProfile(current, response.profile),
+      );
+    }
+
+    return true;
+  };
+
+  const addPrioritySkill = async () => {
+    if (selectedPrioritySkillKey.length === 0) {
+      setPrioritySkillError("Select a skill to add.");
+      return;
+    }
+
+    if (
+      activeScoreProfile.skillPriority.some(
+        (entry) => entry.skillKey === selectedPrioritySkillKey,
+      )
+    ) {
+      setPrioritySkillError("This skill is already selected.");
+      return;
+    }
+
+    const nextSkillPriority = reassignSkillPriorityRanks([
+      ...getSortedSkillPriorityEntries(activeScoreProfile.skillPriority),
+      {
+        skillKey: selectedPrioritySkillKey,
+        rank: activeScoreProfile.skillPriority.length + 1,
+      },
+    ]);
+    const nextProfile: ScoreProfile = {
+      ...activeScoreProfile,
+      skillPriority: nextSkillPriority,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const didSave = await saveSkillPriorityProfile(nextProfile);
+
+    if (didSave) {
+      setSelectedPrioritySkillKey("");
+    }
+  };
+
+  const removePrioritySkill = async (skillKey: string) => {
+    const nextSkillPriority = reassignSkillPriorityRanks(
+      getSortedSkillPriorityEntries(activeScoreProfile.skillPriority).filter(
+        (entry) => entry.skillKey !== skillKey,
+      ),
+    );
+    const nextProfile: ScoreProfile = {
+      ...activeScoreProfile,
+      skillPriority: nextSkillPriority,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await saveSkillPriorityProfile(nextProfile);
+  };
+
+  const movePrioritySkill = async (skillKey: string, direction: -1 | 1) => {
+    const sortedSkillPriority = getSortedSkillPriorityEntries(
+      activeScoreProfile.skillPriority,
+    );
+    const currentIndex = sortedSkillPriority.findIndex(
+      (entry) => entry.skillKey === skillKey,
+    );
+    const nextIndex = currentIndex + direction;
+
+    if (
+      currentIndex < 0 ||
+      nextIndex < 0 ||
+      nextIndex >= sortedSkillPriority.length
+    ) {
+      return;
+    }
+
+    const reorderedSkillPriority = [...sortedSkillPriority];
+    const currentEntry = reorderedSkillPriority[currentIndex];
+    const nextEntry = reorderedSkillPriority[nextIndex];
+
+    if (currentEntry === undefined || nextEntry === undefined) {
+      return;
+    }
+
+    reorderedSkillPriority[currentIndex] = nextEntry;
+    reorderedSkillPriority[nextIndex] = currentEntry;
+
+    const nextProfile: ScoreProfile = {
+      ...activeScoreProfile,
+      skillPriority: reassignSkillPriorityRanks(reorderedSkillPriority),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await saveSkillPriorityProfile(nextProfile);
+  };
+
   const saveUnwantedSkills = async (
     config: UnwantedSkillConfig,
   ): Promise<boolean> => {
@@ -608,6 +723,16 @@ function Dashboard() {
             onSelectedSkillChange={setSelectedIdealSkillKey}
             options={skillCatalogOptions}
             selectedSkillKey={selectedIdealSkillKey}
+          />
+          <SkillPriorityEditor
+            errorMessage={prioritySkillError}
+            onAddSkill={addPrioritySkill}
+            onMoveSkill={movePrioritySkill}
+            onRemoveSkill={removePrioritySkill}
+            onSelectedSkillChange={setSelectedPrioritySkillKey}
+            options={skillCatalogOptions}
+            selectedSkillKey={selectedPrioritySkillKey}
+            skillPriority={activeScoreProfile.skillPriority}
           />
           <UnwantedSkillEditor
             errorMessage={unwantedSkillError}
@@ -899,6 +1024,91 @@ function UnwantedSkillEditor({
       <div className="scoreProfileRow">
         <label>
           Add unwanted skill
+          <select
+            value={selectedSkillKey}
+            onChange={(event) =>
+              onSelectedSkillChange(event.currentTarget.value)
+            }
+          >
+            <option value="">Select skill</option>
+            {options.map((option) => (
+              <option key={option.key} value={option.key}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="button" onClick={onAddSkill}>
+          Add
+        </button>
+      </div>
+      {errorMessage !== null && <p className="errorText">{errorMessage}</p>}
+    </section>
+  );
+}
+
+function SkillPriorityEditor({
+  errorMessage,
+  onAddSkill,
+  onMoveSkill,
+  onRemoveSkill,
+  onSelectedSkillChange,
+  options,
+  selectedSkillKey,
+  skillPriority,
+}: {
+  errorMessage: string | null;
+  onAddSkill: () => void;
+  onMoveSkill: (skillKey: string, direction: -1 | 1) => void;
+  onRemoveSkill: (skillKey: string) => void;
+  onSelectedSkillChange: (skillKey: string) => void;
+  options: SkillCatalogOption[];
+  selectedSkillKey: string;
+  skillPriority: ScoreProfile["skillPriority"];
+}) {
+  const sortedSkillPriority = getSortedSkillPriorityEntries(skillPriority);
+
+  return (
+    <section className="skillPriorityEditor" aria-label="Skill priority">
+      <h3>Skill Priority</h3>
+      {sortedSkillPriority.length === 0 ? (
+        <p className="mutedText">No priority skills selected.</p>
+      ) : (
+        <ol className="skillPriorityList">
+          {sortedSkillPriority.map((entry, index) => (
+            <li key={entry.skillKey}>
+              <span>
+                {entry.rank}. {getSkillOptionLabel(entry.skillKey, options)}
+              </span>
+              <div className="skillPriorityActions">
+                <button
+                  type="button"
+                  onClick={() => onMoveSkill(entry.skillKey, -1)}
+                  disabled={index === 0}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onMoveSkill(entry.skillKey, 1)}
+                  disabled={index === sortedSkillPriority.length - 1}
+                >
+                  ↓
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onRemoveSkill(entry.skillKey)}
+                >
+                  Remove
+                </button>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+      <div className="scoreProfileRow">
+        <label>
+          Add priority skill
           <select
             value={selectedSkillKey}
             onChange={(event) =>
@@ -1514,6 +1724,21 @@ function replaceScoreProfile(
   }
 
   return [...replacedProfiles, profile];
+}
+
+function getSortedSkillPriorityEntries(
+  skillPriority: ScoreProfile["skillPriority"],
+): ScoreProfile["skillPriority"] {
+  return [...skillPriority].sort((left, right) => left.rank - right.rank);
+}
+
+function reassignSkillPriorityRanks(
+  skillPriority: ScoreProfile["skillPriority"],
+): ScoreProfile["skillPriority"] {
+  return skillPriority.map((entry, index) => ({
+    ...entry,
+    rank: index + 1,
+  }));
 }
 
 function getSkillOptionLabel(

@@ -208,6 +208,7 @@ select {
 }
 
 .idealSkillEditor,
+.skillPriorityEditor,
 .unwantedSkillEditor {
   display: grid;
   gap: 10px;
@@ -219,6 +220,7 @@ select {
 }
 
 .idealSkillEditor h3,
+.skillPriorityEditor h3,
 .unwantedSkillEditor h3 {
   margin: 0;
   color: #1f2933;
@@ -226,6 +228,7 @@ select {
 }
 
 .idealSkillEditor label,
+.skillPriorityEditor label,
 .unwantedSkillEditor label {
   display: grid;
   gap: 6px;
@@ -255,6 +258,37 @@ select {
 .errorText {
   margin: 0;
   color: #b42318;
+}
+
+.skillPriorityList {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.skillPriorityList li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid #e4e8ef;
+  border-radius: 6px;
+  padding: 8px;
+  background: #fafbfc;
+}
+
+.skillPriorityActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.skillPriorityActions button {
+  padding: 4px 8px;
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .summaryCards {
