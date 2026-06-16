@@ -33,6 +33,7 @@ type RatingFilter = "all" | "unrated" | "1" | "2" | "3" | "4" | "5";
 type LifecycleFilter = "all" | "active" | "possiblyDeleted";
 type SortKey = "totalScore" | "ownedId" | "name" | "rating" | "customScore";
 type SortDirection = "asc" | "desc";
+type DashboardTab = "list" | "scoreSettings" | "statistics";
 
 type ArtifactFilters = {
   searchText: string;
@@ -106,6 +107,8 @@ function Dashboard() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Loading artifacts...");
+  const [activeDashboardTab, setActiveDashboardTab] =
+    useState<DashboardTab>("list");
   const activeScoreProfile = getActiveScoreProfile(
     scoreProfiles,
     selectedScoreProfileId,
@@ -679,84 +682,168 @@ function Dashboard() {
 
       <section className="workspace" aria-label="Artifact management">
         <div className="panel">
-          <div className="panelHeader">
-            <div>
-              <h2>Artifacts</h2>
-              <p>{statusMessage}</p>
-            </div>
-            <button type="button" onClick={loadArtifacts} disabled={isLoading}>
-              {isLoading ? "Loading..." : "Refresh"}
+          <h2>Artifacts</h2>
+
+          <div
+            className="dashboardTabs"
+            role="tablist"
+            aria-label="Dashboard sections"
+          >
+            <button
+              id="dashboard-tab-list"
+              className={getDashboardTabClassName(
+                activeDashboardTab === "list",
+              )}
+              type="button"
+              role="tab"
+              aria-selected={activeDashboardTab === "list"}
+              aria-controls="dashboard-tabpanel-list"
+              onClick={() => setActiveDashboardTab("list")}
+            >
+              リスト
+            </button>
+            <button
+              id="dashboard-tab-score-settings"
+              className={getDashboardTabClassName(
+                activeDashboardTab === "scoreSettings",
+              )}
+              type="button"
+              role="tab"
+              aria-selected={activeDashboardTab === "scoreSettings"}
+              aria-controls="dashboard-tabpanel-score-settings"
+              onClick={() => setActiveDashboardTab("scoreSettings")}
+            >
+              スコア設定
+            </button>
+            <button
+              id="dashboard-tab-statistics"
+              className={getDashboardTabClassName(
+                activeDashboardTab === "statistics",
+              )}
+              type="button"
+              role="tab"
+              aria-selected={activeDashboardTab === "statistics"}
+              aria-controls="dashboard-tabpanel-statistics"
+              onClick={() => setActiveDashboardTab("statistics")}
+            >
+              統計
             </button>
           </div>
 
-          <StatisticsSummary statistics={statistics} />
-          <CustomScoreProfileSummary
-            activeProfile={activeScoreProfile}
-            newProfileName={newScoreProfileName}
-            errorMessage={scoreProfileError}
-            profiles={scoreProfiles}
-            onCreateProfile={createScoreProfile}
-            onDeleteProfile={deleteActiveScoreProfile}
-            onNewProfileNameChange={setNewScoreProfileName}
-            onProfileChange={saveSelectedScoreProfile}
-          />
-          <IdealSkillEditor
-            errorMessage={idealSkillError}
-            idealSkillKeys={activeScoreProfile.idealSkillKeys}
-            onAddSkill={addIdealSkill}
-            onRemoveSkill={removeIdealSkill}
-            onSelectedSkillChange={setSelectedIdealSkillKey}
-            options={skillCatalogOptions}
-            selectedSkillKey={selectedIdealSkillKey}
-          />
-          <SkillPriorityEditor
-            errorMessage={prioritySkillError}
-            onAddSkill={addPrioritySkill}
-            onMoveSkill={movePrioritySkill}
-            onRemoveSkill={removePrioritySkill}
-            onSelectedSkillChange={setSelectedPrioritySkillKey}
-            options={skillCatalogOptions}
-            selectedSkillKey={selectedPrioritySkillKey}
-            skillPriority={activeScoreProfile.skillPriority}
-          />
-          <UnwantedSkillEditor
-            errorMessage={unwantedSkillError}
-            onAddSkill={addUnwantedSkill}
-            onRemoveSkill={removeUnwantedSkill}
-            onSelectedSkillChange={setSelectedUnwantedSkillKey}
-            options={skillCatalogOptions}
-            selectedSkillKey={selectedUnwantedSkillKey}
-            unwantedSkillKeys={unwantedSkillConfig.skillKeys}
-          />
+          {activeDashboardTab === "list" && (
+            <section
+              id="dashboard-tabpanel-list"
+              className="dashboardTabPanel"
+              role="tabpanel"
+              aria-labelledby="dashboard-tab-list"
+            >
+              <div className="panelHeader">
+                <p>{statusMessage}</p>
+                <button
+                  type="button"
+                  onClick={loadArtifacts}
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Loading..." : "Refresh"}
+                </button>
+              </div>
 
-          <ArtifactControls
-            artifactCount={artifacts.length}
-            attributeOptions={attributeOptions}
-            filteredCount={filteredRows.length}
-            filters={filters}
-            kindOptions={kindOptions}
-            onFiltersChange={setFilters}
-            onSortChange={setSort}
-            sort={sort}
-          />
+              <ArtifactControls
+                artifactCount={artifacts.length}
+                attributeOptions={attributeOptions}
+                filteredCount={filteredRows.length}
+                filters={filters}
+                kindOptions={kindOptions}
+                onFiltersChange={setFilters}
+                onSortChange={setSort}
+                sort={sort}
+              />
 
-          {artifacts.length === 0 ? (
-            <p className="emptyState">No stored artifacts found.</p>
-          ) : (
-            <ArtifactTable
-              rows={filteredRows}
-              onMemoBlur={(row) =>
-                saveReview(
-                  row.artifact.ownedId,
-                  row.review?.rating ?? 0,
-                  row.review?.memo ?? "",
-                )
-              }
-              onMemoChange={updateMemoDraft}
-              onRatingChange={(row, rating) =>
-                saveReview(row.artifact.ownedId, rating, row.review?.memo ?? "")
-              }
-            />
+              {artifacts.length === 0 ? (
+                <p className="emptyState">No stored artifacts found.</p>
+              ) : (
+                <ArtifactTable
+                  rows={filteredRows}
+                  onMemoBlur={(row) =>
+                    saveReview(
+                      row.artifact.ownedId,
+                      row.review?.rating ?? 0,
+                      row.review?.memo ?? "",
+                    )
+                  }
+                  onMemoChange={updateMemoDraft}
+                  onRatingChange={(row, rating) =>
+                    saveReview(
+                      row.artifact.ownedId,
+                      rating,
+                      row.review?.memo ?? "",
+                    )
+                  }
+                />
+              )}
+            </section>
+          )}
+
+          {activeDashboardTab === "scoreSettings" && (
+            <section
+              id="dashboard-tabpanel-score-settings"
+              className="dashboardTabPanel"
+              role="tabpanel"
+              aria-labelledby="dashboard-tab-score-settings"
+            >
+              <CustomScoreProfileSummary
+                activeProfile={activeScoreProfile}
+                newProfileName={newScoreProfileName}
+                errorMessage={scoreProfileError}
+                profiles={scoreProfiles}
+                onCreateProfile={createScoreProfile}
+                onDeleteProfile={deleteActiveScoreProfile}
+                onNewProfileNameChange={setNewScoreProfileName}
+                onProfileChange={saveSelectedScoreProfile}
+              />
+              <IdealSkillEditor
+                errorMessage={idealSkillError}
+                idealSkillKeys={activeScoreProfile.idealSkillKeys}
+                onAddSkill={addIdealSkill}
+                onRemoveSkill={removeIdealSkill}
+                onSelectedSkillChange={setSelectedIdealSkillKey}
+                options={skillCatalogOptions}
+                selectedSkillKey={selectedIdealSkillKey}
+              />
+              <SkillPriorityEditor
+                errorMessage={prioritySkillError}
+                onAddSkill={addPrioritySkill}
+                onMoveSkill={movePrioritySkill}
+                onRemoveSkill={removePrioritySkill}
+                onSelectedSkillChange={setSelectedPrioritySkillKey}
+                options={skillCatalogOptions}
+                selectedSkillKey={selectedPrioritySkillKey}
+                skillPriority={activeScoreProfile.skillPriority}
+              />
+              <p className="mutedText">
+                Global setting shared by all score profiles.
+              </p>
+              <UnwantedSkillEditor
+                errorMessage={unwantedSkillError}
+                onAddSkill={addUnwantedSkill}
+                onRemoveSkill={removeUnwantedSkill}
+                onSelectedSkillChange={setSelectedUnwantedSkillKey}
+                options={skillCatalogOptions}
+                selectedSkillKey={selectedUnwantedSkillKey}
+                unwantedSkillKeys={unwantedSkillConfig.skillKeys}
+              />
+            </section>
+          )}
+
+          {activeDashboardTab === "statistics" && (
+            <section
+              id="dashboard-tabpanel-statistics"
+              className="dashboardTabPanel"
+              role="tabpanel"
+              aria-labelledby="dashboard-tab-statistics"
+            >
+              <StatisticsSummary statistics={statistics} />
+            </section>
           )}
         </div>
       </section>
@@ -1690,6 +1777,10 @@ function replaceScoreProfile(
   }
 
   return [...replacedProfiles, profile];
+}
+
+function getDashboardTabClassName(isActive: boolean): string {
+  return isActive ? "dashboardTab active" : "dashboardTab";
 }
 
 function getSortedSkillPriorityEntries(

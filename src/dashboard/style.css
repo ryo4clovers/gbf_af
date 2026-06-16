@@ -124,6 +124,47 @@ select {
   color: #52616f;
 }
 
+.dashboardTabs {
+  display: flex;
+  gap: 4px;
+  margin-top: 16px;
+  border-bottom: 1px solid #d8dee8;
+  overflow-x: auto;
+}
+
+.dashboardTab {
+  position: relative;
+  border: 0;
+  border-radius: 0;
+  padding: 10px 16px;
+  color: #52616f;
+  font-weight: 600;
+  background: transparent;
+  white-space: nowrap;
+}
+
+.dashboardTab:hover {
+  background: #eef2f6;
+}
+
+.dashboardTab.active {
+  color: #3366cc;
+}
+
+.dashboardTab.active::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: #3366cc;
+  content: "";
+}
+
+.dashboardTabPanel {
+  padding-top: 16px;
+}
+
 .panelHeader {
   display: flex;
   align-items: flex-start;
