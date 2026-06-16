@@ -65,34 +65,20 @@ select {
   color: #52616f;
 }
 
-.modeSwitch {
-  display: flex;
-  gap: 8px;
+.scanResultSummary {
+  margin-top: 24px;
+}
+
+.scanResultSummary h2 {
   margin: 0;
-  border: 0;
-  padding: 0;
-}
-
-.modeSwitch legend {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  white-space: nowrap;
-  clip-path: inset(50%);
-}
-
-.modeSwitch .active {
-  border-color: #3366cc;
-  color: #ffffff;
-  background: #3366cc;
+  font-size: 18px;
 }
 
 .statusGrid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  margin-top: 24px;
+  margin-top: 12px;
 }
 
 .statusGrid div,
@@ -119,19 +105,13 @@ select {
 }
 
 .workspace {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 12px;
+  display: block;
   margin-top: 24px;
 }
 
 .panel {
   min-height: 180px;
   padding: 16px;
-}
-
-.panel:first-child {
-  grid-row: span 2;
 }
 
 .panel h2 {
@@ -142,10 +122,6 @@ select {
 .panel p {
   margin: 8px 0 0;
   color: #52616f;
-}
-
-.panelAction {
-  margin-top: 16px;
 }
 
 .panelHeader {
@@ -439,12 +415,10 @@ th {
 }
 
 @media (max-width: 800px) {
-  .topBar,
-  .workspace {
+  .topBar {
     display: block;
   }
 
-  .modeSwitch,
   .workspace,
   .panel {
     margin-top: 16px;

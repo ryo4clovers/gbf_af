@@ -69,7 +69,7 @@ type ReviewedArtifactRow = {
 const skillCatalogOptions = getSkillCatalogOptions();
 
 function Dashboard() {
-  const { mode, scan, setMode, setScanState } = useAppStore();
+  const { scan, setScanState } = useAppStore();
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [reviewsByOwnedId, setReviewsByOwnedId] = useState<
     Record<number, ArtifactUserReview>
@@ -654,41 +654,26 @@ function Dashboard() {
           <h1>GBF Artifact Manager</h1>
           <p>Local read-only artifact management workspace</p>
         </div>
-        <fieldset className="modeSwitch">
-          <legend>Mode</legend>
-          <button
-            className={mode === "scan" ? "active" : ""}
-            type="button"
-            onClick={() => setMode("scan")}
-          >
-            Scan
-          </button>
-          <button
-            className={mode === "manage" ? "active" : ""}
-            type="button"
-            onClick={() => setMode("manage")}
-          >
-            Manage
-          </button>
-        </fieldset>
+        <button
+          type="button"
+          onClick={exportCsv}
+          disabled={filteredRows.length === 0}
+        >
+          Export CSV
+        </button>
       </header>
 
-      <section className="statusGrid" aria-label="Scan status">
-        <div>
-          <span>Current page</span>
-          <strong>{scan.currentPage ?? "-"}</strong>
-        </div>
-        <div>
-          <span>Last page</span>
-          <strong>{scan.lastPage ?? "-"}</strong>
-        </div>
-        <div>
-          <span>Total artifacts</span>
-          <strong>{scan.totalCount ?? "-"}</strong>
-        </div>
-        <div>
-          <span>Last scanned</span>
-          <strong>{scan.lastScannedAt ?? "-"}</strong>
+      <section className="scanResultSummary" aria-label="スキャン結果">
+        <h2>スキャン結果</h2>
+        <div className="statusGrid">
+          <div>
+            <span>アーティファクト数</span>
+            <strong>{scan.totalCount ?? "-"}</strong>
+          </div>
+          <div>
+            <span>最終スキャン日時</span>
+            <strong>{scan.lastScannedAt ?? "-"}</strong>
+          </div>
         </div>
       </section>
 
@@ -773,25 +758,6 @@ function Dashboard() {
               }
             />
           )}
-        </div>
-        <div className="panel">
-          <h2>Score Rules</h2>
-          <p>
-            Custom score rule editing will be added after local storage is in
-            place.
-          </p>
-        </div>
-        <div className="panel">
-          <h2>CSV Export</h2>
-          <p>Exports the current filtered artifact list.</p>
-          <button
-            className="panelAction"
-            type="button"
-            onClick={exportCsv}
-            disabled={filteredRows.length === 0}
-          >
-            Export CSV
-          </button>
         </div>
       </section>
     </main>
