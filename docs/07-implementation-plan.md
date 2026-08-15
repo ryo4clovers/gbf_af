@@ -942,7 +942,7 @@ npm test
 * GBF API request を追加していない
 * DOM mutation を追加していない
 * page navigation を追加していない
-* scan / manage / display の責務が混ざっていない
+* scan / display とDashboard管理の責務が混ざっていない
 * user review metadata が rescan で消えない
 * custom score policy と artifact data が分離されている
 

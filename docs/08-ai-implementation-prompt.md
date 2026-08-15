@@ -83,7 +83,6 @@ The project already has these major pieces implemented:
 * Content script bridge
 * Page-context fetch/XHR observer
 * Observation-only scan mode
-* Manage mode
 * Display mode
 * Rating / memo
 * Lifecycle tracking
@@ -97,10 +96,10 @@ Do not rebuild the old Popup-based architecture.
 
 ## Application Modes
 
-The app has three explicit modes:
+The Side Panel has two explicit modes. The Dashboard remains the separate local-management surface:
 
 ```ts
-type AppMode = "scan" | "manage" | "display";
+type AppMode = "scan" | "display";
 ```
 
 ### scan
@@ -119,22 +118,6 @@ Scan mode must not:
 * send GBF API requests
 * navigate pages
 * mutate DOM
-
-### manage
-
-Manage mode works on local stored data.
-
-It supports:
-
-* Dashboard artifact list
-* filtering
-* sorting
-* CSV export
-* statistics
-* rating
-* memo
-* lifecycle filtering
-* future custom score settings
 
 ### display
 

@@ -258,7 +258,7 @@ ArtifactPresence is updated
 Side Panel scan status is updated
 ```
 
-### Manage Flow
+### Dashboard Management Flow
 
 ```text
 User opens Dashboard
@@ -303,10 +303,10 @@ Display mode does not update:
 
 ## Application Modes
 
-The app has three explicit modes.
+The Side Panel has two explicit modes. Local management remains a separate Dashboard concern.
 
 ```ts
-type AppMode = "scan" | "manage" | "display";
+type AppMode = "scan" | "display";
 ```
 
 ### scan
@@ -323,24 +323,6 @@ Responsibilities:
 * mark missing artifacts as possibly deleted after completed full scan
 
 Scan mode is the only mode that should update artifact persistence and lifecycle state from observed artifact list responses.
-
-### manage
-
-Used for local review and analysis.
-
-Responsibilities:
-
-* show stored artifacts
-* update rating and memo
-* filter and sort
-* export CSV
-* show statistics
-* show lifecycle status
-* future custom score configuration
-
-Manage mode works from local storage.
-
-It does not need to observe GBF page network responses.
 
 ### display
 
@@ -696,7 +678,7 @@ Before adding or changing a feature, confirm:
 * Does it avoid automatic game operation?
 * Does it avoid automatic page navigation?
 * Does it avoid polling / retry behavior?
-* Does it preserve scan / manage / display responsibilities?
+* Does it preserve scan / display and Dashboard-management responsibilities?
 * Does it preserve artifact / lifecycle / review / display / score separation?
 * Does it behave correctly with MV3 service worker lifecycle?
 * Does it keep user data local?

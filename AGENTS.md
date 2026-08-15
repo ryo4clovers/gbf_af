@@ -66,10 +66,9 @@ Popup has been migrated to Chrome Side Panel and should not be reintroduced unle
 
 # App Modes
 
-The app has three explicit modes:
+The Side Panel has two explicit modes. Local artifact management belongs to the separate Dashboard:
 
 * `scan`
-* `manage`
 * `display`
 
 ## scan
@@ -83,21 +82,6 @@ Responsibilities:
 * Update artifact presence.
 * Detect possibly deleted artifacts after completed full scan.
 * Keep scan-specific persistence separate from user reviews.
-
-## manage
-
-Responsible for local artifact management.
-
-Responsibilities:
-
-* Dashboard artifact list.
-* Filtering.
-* Sorting.
-* CSV export.
-* Statistics.
-* Rating.
-* Memo.
-* Lifecycle filtering.
 
 ## display
 

@@ -97,10 +97,10 @@ Dashboard では以下を扱います。
 
 ## アプリケーションモード
 
-このツールには、明示的に3つのモードがあります。
+Side Panelには、明示的に2つのモードがあります。ローカル管理は独立したDashboardで行います。
 
 ```ts
-type AppMode = "scan" | "manage" | "display";
+type AppMode = "scan" | "display";
 ```
 
 ### scan
@@ -126,21 +126,6 @@ GBF ページ自身の artifact list response を観測し、アーティファ�
 * page navigation
 * polling / retry による追加通信
 * ゲーム操作
-
-### manage
-
-ローカル保存済みアーティファクトを管理します。
-
-主な責務:
-
-* artifact list
-* filtering
-* sorting
-* CSV export
-* statistics summary
-* rating
-* memo
-* lifecycle filtering
 
 ### display
 
@@ -352,7 +337,7 @@ gbf_af/
 * GBF API へ拡張機能独自の request を送っていないか
 * page navigation を発生させていないか
 * polling / retry によってゲーム側通信を増やしていないか
-* scan / manage / display mode の責務が混ざっていないか
+* scan / display mode とDashboard管理の責務が混ざっていないか
 * Artifact / lifecycle / user review / display / scoring policy の分離を壊していないか
 * MV3 service worker lifecycle を考慮しているか
 

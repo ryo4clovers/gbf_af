@@ -735,16 +735,12 @@ type DisplayError = {
 ## AppMode
 
 ```ts
-type AppMode = "scan" | "manage" | "display";
+type AppMode = "scan" | "display";
 ```
 
 ### scan
 
 artifact observation and persistence mode.
-
-### manage
-
-local artifact management mode.
 
 ### display
 

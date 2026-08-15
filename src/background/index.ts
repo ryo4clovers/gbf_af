@@ -56,6 +56,7 @@ import {
 } from "./artifactMemoryStorage";
 
 let currentMode: AppMode = "scan";
+let modeOperationQueue: Promise<void> = Promise.resolve();
 let currentScanState = initialScanState;
 let currentDisplayState: DisplayState = initialDisplayState;
 
@@ -127,13 +128,13 @@ async function handleMessage(
         display: currentDisplayState,
       };
     case "START_OBSERVING":
-      return startObserving();
+      return runModeOperation(startObserving);
     case "STOP_OBSERVING":
-      return stopObserving();
+      return runModeOperation(stopObserving);
     case "START_DISPLAY_MODE":
-      return startDisplayMode();
+      return runModeOperation(startDisplayMode);
     case "STOP_DISPLAY_MODE":
-      return stopDisplayMode();
+      return runModeOperation(stopDisplayMode);
     case "GET_DISPLAY_STATE":
       return {
         ok: true,
@@ -195,6 +196,32 @@ async function openSidePanelForTab(tab: chrome.tabs.Tab): Promise<void> {
 }
 
 async function startObserving(): Promise<ExtensionResponse> {
+  if (currentDisplayState.isEnabled) {
+    return {
+      ok: false,
+      type: "ERROR",
+      message: "Stop display mode before starting artifact observation.",
+      errorCode: "unexpected_response",
+      scan: currentScanState,
+      display: currentDisplayState,
+    };
+  }
+
+  const activeSession = await getActiveScanSession();
+
+  if (activeSession !== null) {
+    currentMode = "scan";
+    currentScanState = await hydratePersistedScanState(currentScanState);
+
+    return {
+      ok: true,
+      type: "OBSERVATION_STATUS",
+      message: "Artifact observation is already active.",
+      observing: true,
+      scan: currentScanState,
+    };
+  }
+
   const tab = await getActiveTab();
 
   if (tab?.id === undefined) {
@@ -373,6 +400,17 @@ async function stopObserving(): Promise<ExtensionResponse> {
 }
 
 async function startDisplayMode(): Promise<ExtensionResponse> {
+  if (currentDisplayState.isEnabled) {
+    currentMode = "display";
+
+    return {
+      ok: true,
+      type: "DISPLAY_STATUS",
+      message: "Display mode is already active.",
+      display: currentDisplayState,
+    };
+  }
+
   const tab = await getActiveTab();
 
   if (tab?.id === undefined) {
@@ -445,6 +483,19 @@ async function startDisplayMode(): Promise<ExtensionResponse> {
     message: "Display mode started.",
     display: currentDisplayState,
   };
+}
+
+function runModeOperation(
+  operation: () => Promise<ExtensionResponse>,
+): Promise<ExtensionResponse> {
+  const result = modeOperationQueue.then(operation, operation);
+
+  modeOperationQueue = result.then(
+    () => undefined,
+    () => undefined,
+  );
+
+  return result;
 }
 
 async function stopDisplayMode(): Promise<ExtensionResponse> {

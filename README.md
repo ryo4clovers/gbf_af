@@ -66,7 +66,7 @@ Popup は現在使用していません。
 
 ## モード
 
-このツールには明示的な3つのモードがあります。
+Side Panelには明示的な2つのモードがあります。保存済みデータの管理は独立したDashboardで行います。
 
 ### scan
 
@@ -79,19 +79,6 @@ GBFページ自身の通信を観測し、アーティファクト一覧を収�
 - artifact presence 更新
 - full scan 完了後の possiblyDeleted 判定
 - legacy ArtifactPresence backfill
-
-### manage
-
-保存済みアーティファクトを管理します。
-
-主な責務:
-
-- dashboard での一覧表示
-- rating / memo 編集
-- filter / sort
-- statistics
-- CSV export
-- lifecycle 状態確認
 
 ### display
 
@@ -354,5 +341,5 @@ npm run format
 * GBF API へ独自リクエストを送っていないか
 * page navigation を発生させていないか
 * polling / retry によってゲーム側通信を増やしていないか
-* scan / manage / display mode の責務が混ざっていないか
+* scan / display mode とDashboard管理の責務が混ざっていないか
 * Artifact / lifecycle / user review / scoring policy のデータ分離を壊していないか

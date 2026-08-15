@@ -58,7 +58,7 @@ Side Panel は拡張機能のメイン入口。
 
 ### 目的
 
-* scan / manage / display の mode を切り替える
+* scan / display の mode をブラウザタブ風UIで切り替える
 * scan の開始・停止を行う
 * scan 状態を確認する
 * display mode の companion view を表示する
@@ -70,19 +70,15 @@ Side Panel は拡張機能のメイン入口。
 Side Panel
 ├─ Header
 │  ├─ App Title
-│  └─ Current Mode
+│  └─ Material Icon付きDashboard Button
 ├─ Mode Controls
 │  ├─ scan
-│  ├─ manage
 │  └─ display
 ├─ Scan Panel
-│  ├─ Start Observing
-│  ├─ Stop Observing
-│  ├─ Current Page
-│  ├─ Last Page
-│  ├─ Total Count
-│  ├─ Observed Pages
-│  ├─ Last Observed At
+│  ├─ Scan / Stop Toggle Button
+│  ├─ Status
+│  ├─ Observed Artifact Count
+│  ├─ 5-column Page Progress
 │  └─ Error Message
 ├─ Display Panel
 │  ├─ Current Observed Page
@@ -120,9 +116,9 @@ scan mode は artifact list response の観測・保存を行う。
 * GBFページの自動遷移は行わない
 * GBF APIへの独自requestは送信しない
 
-### manage
+### Dashboard access
 
-manage mode は Dashboard への導線を提供する。
+Side Panelのヘッダーは、Material Icon付きのDashboard導線を提供する。
 
 表示する情報:
 
@@ -136,7 +132,7 @@ manage mode は Dashboard への導線を提供する。
 
 注意:
 
-* manage mode 自体は Side Panel 内で大量一覧を表示しない
+* Side Panelには独立したmanage modeを設けない
 * 一覧・フィルタ・CSV・詳細管理は Dashboard に集約する
 
 ### display
@@ -995,6 +991,6 @@ UI変更時は以下を確認する。
 * GBF API request を送信していないか
 * page navigation を発生させていないか
 * display mode で persistence / lifecycle update をしていないか
-* scan / manage / display の責務が混ざっていないか
+* scan / display とDashboard管理の責務が混ざっていないか
 * game score と custom score を混同していないか
 * rating / memo が再スキャンで消えない設計になっているか

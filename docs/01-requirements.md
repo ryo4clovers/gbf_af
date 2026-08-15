@@ -144,9 +144,9 @@ scan mode では、観測した artifact list response を保存対象として�
 - scan 結果で rating / memo を消すこと
 - GBF 側の `is_unnecessary` と user review を混同すること
 
-### R-007: Manage Mode
+### R-007: Dashboard Management
 
-manage mode では、保存済み artifact を管理できること。
+Side Panelの管理モードは設けず、保存済みartifactの管理はDashboardへ集約すること。
 
 要件:
 

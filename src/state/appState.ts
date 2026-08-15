@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { type DisplayState, initialDisplayState } from "../domain/displayMode";
 
-export type AppMode = "scan" | "manage" | "display";
+export type AppMode = "scan" | "display";
 
 export type ScanStatus =
   | "idle"
