@@ -1,5 +1,5 @@
 import type { NormalizedArtifactSkill } from "../skill/normalizedSkill";
-import { TABLE_RANK_MULTIPLIER } from "./scoreConstants";
+import type { TableRankPenalties } from "./customScoreSettings";
 import type { ScoreReason } from "./scoreResult";
 
 export function createIdealMatchReason(args: {
@@ -26,30 +26,30 @@ export function createSkillScoreReason(args: {
   };
 }
 
-export function createAppliedTableMultiplierReason(args: {
+export function createAppliedTablePenaltyReason(args: {
   skill: NormalizedArtifactSkill;
-  baseScore: number;
-  multipliedScore: number;
+  penalty: number;
 }): ScoreReason {
   return {
-    type: "table_multiplier",
+    type: "table_penalty",
     skillKey: args.skill.normalizedKey,
     label:
       args.skill.tableRank === undefined
         ? `${args.skill.rawName} rank unknown`
         : `${args.skill.rawName} rank ${args.skill.tableRank}`,
-    delta: roundScore(args.multipliedScore - args.baseScore),
+    delta: -args.penalty,
   };
 }
 
-export function getTableRankMultiplier(
-  skill: Pick<NormalizedArtifactSkill, "tableRank">,
+export function getTableRankPenalty(
+  skill: Pick<NormalizedArtifactSkill, "slot" | "tableRank">,
+  penalties: TableRankPenalties,
 ): number {
-  if (skill.tableRank === undefined) {
-    return 1.0;
+  if (skill.slot === 4 || skill.tableRank === undefined) {
+    return 0;
   }
 
-  return TABLE_RANK_MULTIPLIER[skill.tableRank];
+  return penalties[skill.tableRank];
 }
 
 export function roundScore(score: number): number {

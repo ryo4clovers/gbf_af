@@ -9,9 +9,9 @@ import {
   type IdealSkillConfiguration,
 } from "./idealSkillConfiguration";
 import {
-  createAppliedTableMultiplierReason,
+  createAppliedTablePenaltyReason,
   createIdealMatchReason,
-  getTableRankMultiplier,
+  getTableRankPenalty,
   roundScore,
 } from "./scoreExplanation";
 import type { ScoreReason } from "./scoreResult";
@@ -46,24 +46,28 @@ export function evaluateIdealRoute(args: {
     }),
   ];
 
-  const perMatchedSkillBaseScore = matchCount > 0 ? matchScore / matchCount : 0;
-  const tableMultiplierScore = matchedSkills.reduce((total, skill) => {
-    const multipliedScore =
-      perMatchedSkillBaseScore * getTableRankMultiplier(skill);
+  let adjustedScore = matchScore;
 
-    reasons.push(
-      createAppliedTableMultiplierReason({
-        skill,
-        baseScore: perMatchedSkillBaseScore,
-        multipliedScore,
-      }),
+  for (const skill of matchedSkills) {
+    const requestedPenalty = getTableRankPenalty(
+      skill,
+      args.settings.tableRankPenalties,
     );
+    const appliedPenalty = Math.min(adjustedScore, requestedPenalty);
 
-    return total + (multipliedScore - perMatchedSkillBaseScore);
-  }, 0);
+    if (appliedPenalty > 0) {
+      reasons.push(
+        createAppliedTablePenaltyReason({
+          skill,
+          penalty: appliedPenalty,
+        }),
+      );
+      adjustedScore -= appliedPenalty;
+    }
+  }
 
   return {
-    score: roundScore(matchScore + tableMultiplierScore),
+    score: roundScore(adjustedScore),
     reasons,
   };
 }

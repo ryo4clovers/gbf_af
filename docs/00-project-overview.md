@@ -263,7 +263,7 @@ finalScore =
 ```text
 idealRouteScore =
   ideal match score
-  + table multiplier for matched ideal skills
+  - table-rank penalties for concretely matched skills
 ```
 
 一致判定:
@@ -281,8 +281,7 @@ idealRouteScore =
 
 ```text
 priorityRouteScore =
-  sum of per-skill scores
-  + table multiplier
+  sum of max(0, per-skill score - table-rank penalty)
 ```
 
 各枠グループの全スキルへ0～25点を設定し、不要スキル情報は計算へ使用しません。
@@ -293,16 +292,16 @@ priorityRouteScore =
 
 基本方針:
 
-* `e` を最も高く評価する
-* `a` を最も低く評価する
+* `a` の減点を最も大きく、`e` の減点を最も小さくする
 * ただし「欲しいスキルの d」は「微妙なスキルの e」より高く評価する
-* そのため、効果量テーブル補正は独立加点ではなく、スキル基礎点への倍率補正として扱う
+* 減点幅は0～25でユーザーが調整し、`a >= b >= c >= d >= e`を維持する
+* 理想構成ルートでも、具体的に一致したスキルの減点を基礎スコアから差し引く
 
 例:
 
 ```text
-important skill d: 25 * 1.15 = 28.75
-minor skill e:     10 * 1.25 = 12.5
+important skill d: max(0, 25 - 1) = 24
+minor skill e:     max(0, 10 - 0) = 10
 ```
 
 #### Skill Level Baseline

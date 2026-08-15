@@ -339,8 +339,19 @@ select option {
   gap: 8px;
 }
 
+.scoreSettingsFieldset {
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.scoreSettingsFieldset:disabled {
+  cursor: wait;
+}
+
 .idealSkillEditor,
 .idealMatchScoreEditor,
+.tableRankPenaltySettings,
 .skillScoreEditor {
   display: grid;
   gap: 10px;
@@ -353,6 +364,7 @@ select option {
 
 .idealSkillEditor h3,
 .idealMatchScoreEditor h3,
+.tableRankPenaltySettings h3,
 .skillScoreEditor h3 {
   margin: 0;
   color: var(--color-text);
@@ -400,7 +412,8 @@ select option {
   gap: 8px;
 }
 
-.idealMatchScoreDialog {
+.idealMatchScoreDialog,
+.tableRankPenaltyDialog {
   box-sizing: border-box;
   width: min(760px, calc(100vw - 32px));
   border: 1px solid var(--color-border-strong);
@@ -411,7 +424,8 @@ select option {
   box-shadow: var(--shadow-panel);
 }
 
-.idealMatchScoreDialog::backdrop {
+.idealMatchScoreDialog::backdrop,
+.tableRankPenaltyDialog::backdrop {
   background: rgba(20, 31, 43, 0.58);
   backdrop-filter: blur(3px);
 }
@@ -435,6 +449,53 @@ select option {
   margin-top: 0;
   border-top: 0;
   padding-top: 14px;
+}
+
+.tableRankPenaltySettings {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.tableRankPenaltySettings > button {
+  justify-self: end;
+}
+
+.tableRankPenaltyGrid {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.tableRankPenaltyGrid .skillScoreSlider {
+  display: grid;
+  grid-template-columns: 100px minmax(160px, 1fr) 32px;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  background: var(--color-surface-muted);
+}
+
+.idealMatchScoreDialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.eyebrow {
+  margin: 0 0 3px;
+  color: var(--color-accent-strong);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.dialogCloseButton {
+  min-width: 36px;
+  padding: 6px 10px;
+  font-size: 20px;
+  line-height: 1;
 }
 
 .idealConfigurationTableScroller {
@@ -1007,6 +1068,14 @@ tbody tr:hover {
 
   .idealSkillEditorActions {
     justify-content: flex-start;
+  }
+
+  .tableRankPenaltySettings {
+    grid-template-columns: 1fr;
+  }
+
+  .tableRankPenaltySettings > button {
+    justify-self: start;
   }
 
   .skillScoreGrid {

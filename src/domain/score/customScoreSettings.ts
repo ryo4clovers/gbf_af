@@ -1,4 +1,4 @@
-import type { NormalizedSkillKey } from "../skill/normalizedSkill";
+import type { NormalizedSkillKey, TableRank } from "../skill/normalizedSkill";
 import {
   createDefaultIdealSkillConfiguration,
   IDEAL_FIRST_SECOND_SLOT_OPTIONS,
@@ -11,6 +11,7 @@ export type CustomScoreSettings = {
   idealSkillConfigurations: IdealSkillConfiguration[];
   idealMatchScores: IdealMatchScores;
   skillScores: SkillScores;
+  tableRankPenalties: TableRankPenalties;
   updatedAt: string;
 };
 
@@ -37,6 +38,8 @@ export type SkillScores = {
   fourthSlot: SkillScoreEntry[];
 };
 
+export type TableRankPenalties = Record<TableRank, number>;
+
 type LegacySkillPriorityEntry = {
   skillKey: NormalizedSkillKey;
   rank: number;
@@ -54,6 +57,14 @@ export const DEFAULT_IDEAL_MATCH_SCORES: IdealMatchScores = {
   4: 100,
 };
 
+export const DEFAULT_TABLE_RANK_PENALTIES: TableRankPenalties = {
+  a: 4,
+  b: 3,
+  c: 2,
+  d: 1,
+  e: 0,
+};
+
 export const DEFAULT_CUSTOM_SCORE_SETTINGS: CustomScoreSettings = {
   idealSkillConfigurations: [
     createDefaultIdealSkillConfiguration("default-ideal-configuration"),
@@ -67,6 +78,7 @@ export const DEFAULT_CUSTOM_SCORE_SETTINGS: CustomScoreSettings = {
     { skillKey: "triple_attack_rate", rank: 5 },
     { skillKey: "attack_power", rank: 6 },
   ]),
+  tableRankPenalties: { ...DEFAULT_TABLE_RANK_PENALTIES },
   updatedAt: "default",
 };
 
@@ -89,8 +101,48 @@ export function withCustomScoreSettingsDefaults(
     skillScores: settings.skillScores
       ? normalizeSkillScores(settings.skillScores)
       : createSkillScoresFromLegacyPriority(settings.skillPriority ?? []),
+    tableRankPenalties: {
+      ...DEFAULT_TABLE_RANK_PENALTIES,
+      ...settings.tableRankPenalties,
+    },
     updatedAt: settings.updatedAt ?? "default",
   };
+}
+
+export function validateTableRankPenalties(penalties: unknown): string | null {
+  if (typeof penalties !== "object" || penalties === null) {
+    return "Table rank penalties are required.";
+  }
+
+  const ranks: TableRank[] = ["a", "b", "c", "d", "e"];
+  const values = ranks.map((rank) => Reflect.get(penalties, rank));
+
+  if (
+    !values.every(
+      (value) =>
+        typeof value === "number" &&
+        Number.isInteger(value) &&
+        value >= 0 &&
+        value <= 25,
+    )
+  ) {
+    return "Table rank penalties must be integers from 0 to 25.";
+  }
+
+  for (let index = 1; index < values.length; index += 1) {
+    const previousValue = values[index - 1];
+    const currentValue = values[index];
+
+    if (
+      typeof previousValue === "number" &&
+      typeof currentValue === "number" &&
+      previousValue < currentValue
+    ) {
+      return "Table rank penalties must satisfy a >= b >= c >= d >= e.";
+    }
+  }
+
+  return null;
 }
 
 export function validateSkillScores(skillScores: unknown): string | null {

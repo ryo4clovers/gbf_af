@@ -364,8 +364,7 @@ export type ScoreReason = {
   type:
     | "ideal_match"
     | "priority_skill"
-    | "table_multiplier"
-    | "unwanted_penalty";
+    | "table_penalty";
   skillKey?: NormalizedSkillKey;
   label: string;
   delta: number;
@@ -376,28 +375,20 @@ export type ScoreReason = {
 
 ```ts id="k938kk"
 export const IDEAL_MATCH_SCORE = {
-  0: 0,
-  1: 20,
-  2: 45,
+  1: 0,
+  2: 0,
   3: 75,
-  4: 110,
+  4: 100,
 } as const;
 
-export const TABLE_RANK_MULTIPLIER = {
-  a: 1.0,
-  b: 1.05,
-  c: 1.1,
-  d: 1.15,
-  e: 1.25,
+export const DEFAULT_TABLE_RANK_PENALTIES = {
+  a: 4,
+  b: 3,
+  c: 2,
+  d: 1,
+  e: 0,
 } as const;
 
-export const UNWANTED_SKILL_PENALTY = {
-  0: 0,
-  1: 25,
-  2: 60,
-  3: 100,
-  4: 150,
-} as const;
 ```
 
 ### Validation
@@ -419,8 +410,7 @@ Custom Score の中核計算を UI / storage から独立した pure function �
 * `evaluateIdealRoute` を実装する
 * `evaluatePriorityRoute` を実装する
 * `countIdealMatches` を実装する
-* `applyTableMultiplier` を実装する
-* `calculateUnwantedPenalty` を実装する
+* `getTableRankPenalty` を実装する
 * score reasons を生成する
 
 ### 推奨ファイル
@@ -448,29 +438,27 @@ finalScore =
 ```text id="ealmsg"
 idealRouteScore =
   ideal match score
-  + table multiplier for matched ideal skills
+  - table-rank penalties for concretely matched skills
 ```
 
 仕様:
 
 * 1/4, 2/4, 3/4, 4/4 の4段階で一致判定
-* slot position は見ない
-* unwanted skill penalty は重視しない
+* 1～2枠は順不同、3枠と4枠は対応する枠で判定する
+* 未選択枠はワイルドカード一致とし、テーブルランク減点を適用しない
 * matched ideal skill の table rank を反映する
 
 ### Priority Route
 
 ```text id="ijbsh9"
 priorityRouteScore =
-  skill priority score
-  + table multiplier
-  - unwanted skill penalty
+  sum of max(0, per-skill score - table-rank penalty)
 ```
 
 仕様:
 
 * skill priority の上位ほど高い base score
-* table rank は base score に対する multiplier
+* table rank は base score から差し引く固定減点
 * unwanted skill は減点
 * 1つで大きく減点
 * 複数で段階的に減点
@@ -518,11 +506,10 @@ Route: priority
 * ideal 2/4 match
 * ideal 3/4 match
 * ideal 4/4 match
-* slot position ignored
-* priority order affects score
-* unwanted skill penalty
-* multiple unwanted skills progressive penalty
-* table rank multiplier
+* slots 1–2 unordered and slots 3–4 exact matching
+* per-skill score affects score
+* unwanted-skill metadata does not affect score
+* configurable table-rank penalty
 * desired skill rank d beats minor skill rank e
 * final score chooses ideal route
 * final score chooses priority route
@@ -830,9 +817,8 @@ customScoreReasons
 * sample API response で evaluator を確認する
 * 実際の保存済み artifacts で score distribution を確認する
 * ideal match score を調整する
-* table multiplier を調整する
-* unwanted penalty を調整する
-* skill priority base score を調整する
+* table-rank penalty を調整する
+* per-skill score を調整する
 * score reasons が理解しやすいか確認する
 
 ### 確認観点
@@ -1051,20 +1037,20 @@ Mitigation:
 * calculate from Artifact + ScoreProfile
 * cache only with explicit versioning if needed
 
-### Risk: unwanted skill penalty hides ideal match value
+### Risk: table-rank penalty hides low base scores
 
 Mitigation:
 
-* final score uses max of ideal route and priority route
-* unwanted penalty is applied mainly in priority route
-* ideal route focuses on closeness to desired composition
+* floor each adjusted score at zero
+* keep table-rank penalties configurable from 0 to 25
+* validate `a >= b >= c >= d >= e`
 
 ### Risk: table rank overpowers skill priority
 
 Mitigation:
 
-* table rank is multiplier, not large independent additive score
-* tune multipliers conservatively
+* table rank is a small fixed subtraction from skill score
+* validate `a >= b >= c >= d >= e`
 * test desired skill rank d > minor skill rank e
 
 ## Done Criteria for Custom Score Phase 1
@@ -1072,13 +1058,12 @@ Mitigation:
 Phase 1 is complete when:
 
 * user can define ideal skill composition
-* user can define skill priority
-* user can define unwanted skills
+* user can define a score for every skill in each slot group
+* unwanted-skill metadata does not affect scoring
 * evaluator calculates final score using `max(idealRouteScore, priorityRouteScore)`
 * ideal route supports 1/4〜4/4 match
-* slot position is ignored for ideal match
-* priority route applies unwanted skill penalty
-* table rank multiplier is applied
+* slots 1–2 are unordered and slots 3–4 match their corresponding slots
+* table-rank penalty is applied to both routes
 * Lv1 baseline policy is documented and reflected
 * score result includes explanation reasons
 * Dashboard can display custom score

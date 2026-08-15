@@ -923,6 +923,7 @@ type CustomScoreSettings = {
   idealSkillConfigurations: IdealSkillConfiguration[];
   idealMatchScores: IdealMatchScores;
   skillScores: SkillScores;
+  tableRankPenalties: TableRankPenalties;
   updatedAt: string;
 };
 
@@ -980,7 +981,7 @@ type ScoreReason = {
   type:
     | "ideal_match"
     | "priority_skill"
-    | "table_multiplier";
+    | "table_penalty";
   skillKey?: NormalizedSkillKey;
   label: string;
   delta: number;
@@ -1001,12 +1002,12 @@ const DEFAULT_IDEAL_MATCH_SCORES = {
 ```
 
 ```ts
-const TABLE_RANK_MULTIPLIER = {
-  a: 1.0,
-  b: 1.05,
-  c: 1.1,
-  d: 1.15,
-  e: 1.25,
+const DEFAULT_TABLE_RANK_PENALTIES = {
+  a: 4,
+  b: 3,
+  c: 2,
+  d: 1,
+  e: 0,
 } as const;
 ```
 
@@ -1072,7 +1073,7 @@ Phase 1 では、まず `skill_quality` ベースを優先し、必要に応じ�
 
 * 第4スキルは a〜e rank ではない可能性が高い
 * slot別に table rank の扱いを変える
-* rank 不明時は multiplier `1.0` 相当として扱う
+* rank 不明時は減点`0`として扱う
 
 ## Custom Score Evaluation
 
@@ -1091,7 +1092,7 @@ finalScore =
 ```text
 idealRouteScore =
   ideal match score
-  + table multiplier for matched ideal skills
+  - table-rank penalties for concretely matched skills
 ```
 
 仕様:
@@ -1105,8 +1106,7 @@ idealRouteScore =
 
 ```text
 priorityRouteScore =
-  sum of per-skill scores
-  + table multiplier
+  sum of max(0, per-skill score - table-rank penalty)
 ```
 
 仕様:

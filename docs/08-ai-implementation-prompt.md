@@ -248,20 +248,14 @@ Evaluates how close the artifact is to the user's ideal skill composition.
 ```text
 idealRouteScore =
   ideal match score
-  + table multiplier for matched ideal skills
+  - table-rank penalties for concretely matched skills
 ```
 
 Rules:
 
 * Evaluate match count as 1/4, 2/4, 3/4, or 4/4.
-* Ignore skill slot position.
-* Do not let unwanted skill penalty dominate this route.
-* This route exists because an artifact close to the ideal composition is valuable even if one skill needs rerolling.
-
-Reasoning:
-
-* A single unwanted skill can be changed in-game with an item.
-* Therefore, ideal composition closeness is more important than unwanted skill penalty in this route.
+* Match slots 1–2 as an unordered pair and slots 3–4 against their corresponding slots.
+* Treat unselected slots as wildcard matches without table-rank penalties.
 
 ### priorityRouteScore
 
@@ -269,18 +263,13 @@ Evaluates general skill value.
 
 ```text
 priorityRouteScore =
-  skill priority score
-  + table multiplier
-  - unwanted skill penalty
+  sum of max(0, per-skill score - table-rank penalty)
 ```
 
 Rules:
 
-* Higher priority skills score higher.
-* Unwanted skills are penalized.
-* One unwanted skill is a large penalty.
-* Multiple unwanted skills are penalized progressively.
-* Unwanted skill configuration is global in Phase 1, not profile-specific.
+* Users assign every skill an integer score from 0 to 25 in its slot group.
+* Unwanted-skill metadata does not affect scoring.
 
 ### Effect Table Handling
 
@@ -288,16 +277,16 @@ Many skills have an effect table rank from `a` to `e`.
 
 Rules:
 
-* `e` is the highest table rank.
-* `a` is the lowest table rank.
+* Rank `a` receives the largest penalty and rank `e` the smallest.
 * A desired skill with rank `d` should score higher than a low-value skill with rank `e`.
-* Therefore, table quality should be a multiplier on skill base score, not a large independent additive score.
+* Penalties are user-configurable integers from 0 to 25 and satisfy `a >= b >= c >= d >= e`.
+* Subtraction is floored at zero.
 
 Example:
 
 ```text
-important skill d: 30 * 1.15 = 34.5
-minor skill e:     10 * 1.25 = 12.5
+important skill d: max(0, 25 - 1) = 24
+minor skill e:     max(0, 10 - 0) = 10
 ```
 
 ### Skill Level Handling
@@ -444,8 +433,7 @@ export type ScoreReason = {
   type:
     | "ideal_match"
     | "priority_skill"
-    | "table_multiplier"
-    | "unwanted_penalty";
+    | "table_penalty";
   skillKey?: NormalizedSkillKey;
   label: string;
   delta: number;
@@ -458,28 +446,20 @@ Use these as initial candidates. They may be tuned later.
 
 ```ts
 export const IDEAL_MATCH_SCORE = {
-  0: 0,
-  1: 20,
-  2: 45,
+  1: 0,
+  2: 0,
   3: 75,
-  4: 110,
+  4: 100,
 } as const;
 
-export const TABLE_RANK_MULTIPLIER = {
-  a: 1.0,
-  b: 1.05,
-  c: 1.1,
-  d: 1.15,
-  e: 1.25,
+export const DEFAULT_TABLE_RANK_PENALTIES = {
+  a: 4,
+  b: 3,
+  c: 2,
+  d: 1,
+  e: 0,
 } as const;
 
-export const UNWANTED_SKILL_PENALTY = {
-  0: 0,
-  1: 25,
-  2: 60,
-  3: 100,
-  4: 150,
-} as const;
 ```
 
 ## Skill Normalization Guidance
@@ -534,7 +514,7 @@ Be careful:
 
 * Slot 4 may not follow the same a-e table.
 * Do not overvalue slot 4 using this mapping without validation.
-* If table rank is unknown, use multiplier `1.0`.
+* If table rank is unknown, use penalty `0`.
 
 ## Score Explanation Requirement
 

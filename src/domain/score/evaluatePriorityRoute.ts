@@ -11,9 +11,9 @@ import {
   type IdealSkillOption,
 } from "./idealSkillConfiguration";
 import {
-  createAppliedTableMultiplierReason,
+  createAppliedTablePenaltyReason,
   createSkillScoreReason,
-  getTableRankMultiplier,
+  getTableRankPenalty,
   roundScore,
 } from "./scoreExplanation";
 import type { ScoreReason } from "./scoreResult";
@@ -32,7 +32,12 @@ export function evaluatePriorityRoute(args: {
 
   for (const skill of args.skills) {
     const baseScore = getConfiguredSkillScore(skill, args.settings);
-    const multipliedScore = baseScore * getTableRankMultiplier(skill);
+    const requestedPenalty = getTableRankPenalty(
+      skill,
+      args.settings.tableRankPenalties,
+    );
+    const adjustedScore = Math.max(0, baseScore - requestedPenalty);
+    const appliedPenalty = baseScore - adjustedScore;
 
     reasons.push(
       createSkillScoreReason({
@@ -41,15 +46,16 @@ export function evaluatePriorityRoute(args: {
         score: baseScore,
       }),
     );
-    reasons.push(
-      createAppliedTableMultiplierReason({
-        skill,
-        baseScore,
-        multipliedScore,
-      }),
-    );
+    if (appliedPenalty > 0) {
+      reasons.push(
+        createAppliedTablePenaltyReason({
+          skill,
+          penalty: appliedPenalty,
+        }),
+      );
+    }
 
-    score += multipliedScore;
+    score += adjustedScore;
   }
 
   return {

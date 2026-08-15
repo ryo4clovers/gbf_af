@@ -12,8 +12,11 @@ import {
   DEFAULT_CUSTOM_SCORE_SETTINGS,
   type IdealMatchScores,
   type SkillScores,
+  type TableRankPenalties,
   validateIdealMatchScores,
   validateSkillScores,
+  validateTableRankPenalties,
+  withCustomScoreSettingsDefaults,
 } from "../domain/score/customScoreSettings";
 import { evaluateCustomScore } from "../domain/score/evaluateCustomScore";
 import {
@@ -142,6 +145,11 @@ function Dashboard() {
   const [prioritySkillError, setPrioritySkillError] = useState<string | null>(
     null,
   );
+  const [tableRankPenaltyError, setTableRankPenaltyError] = useState<
+    string | null
+  >(null);
+  const [isScoreSettingsSaving, setIsScoreSettingsSaving] = useState(false);
+  const scoreSettingsSaveInFlightRef = useRef(false);
   const [filters, setFilters] = useState<ArtifactFilters>(initialFilters);
   const [sort, setSort] = useState<ArtifactSort>({
     key: "totalScore",
@@ -232,7 +240,9 @@ function Dashboard() {
       customScoreSettingsResponse.ok &&
       customScoreSettingsResponse.type === "CUSTOM_SCORE_SETTINGS"
     ) {
-      setCustomScoreSettings(customScoreSettingsResponse.settings);
+      setCustomScoreSettings(
+        withCustomScoreSettingsDefaults(customScoreSettingsResponse.settings),
+      );
     } else {
       setCustomScoreSettings(DEFAULT_CUSTOM_SCORE_SETTINGS);
       setScoreSettingsError("スコア設定を読み込めませんでした。");
@@ -312,23 +322,36 @@ function Dashboard() {
     setError: (message: string | null) => void,
     errorMessage: string,
   ): Promise<boolean> => {
-    setError(null);
-
-    const response = await sendRuntimeMessage({
-      type: "SAVE_CUSTOM_SCORE_SETTINGS",
-      settings,
-    });
-
-    if (!response.ok) {
-      setError(errorMessage);
+    if (scoreSettingsSaveInFlightRef.current) {
       return false;
     }
 
-    if (response.type === "SAVE_CUSTOM_SCORE_SETTINGS_RESULT") {
-      setCustomScoreSettings(response.settings);
-    }
+    scoreSettingsSaveInFlightRef.current = true;
+    setIsScoreSettingsSaving(true);
+    setError(null);
 
-    return true;
+    try {
+      const response = await sendRuntimeMessage({
+        type: "SAVE_CUSTOM_SCORE_SETTINGS",
+        settings: withCustomScoreSettingsDefaults(settings),
+      });
+
+      if (!response.ok) {
+        setError(`${errorMessage} ${response.message}`);
+        return false;
+      }
+
+      if (response.type === "SAVE_CUSTOM_SCORE_SETTINGS_RESULT") {
+        setCustomScoreSettings(
+          withCustomScoreSettingsDefaults(response.settings),
+        );
+      }
+
+      return true;
+    } finally {
+      scoreSettingsSaveInFlightRef.current = false;
+      setIsScoreSettingsSaving(false);
+    }
   };
 
   const saveIdealMatchScores = async (
@@ -404,6 +427,31 @@ function Dashboard() {
       nextSettings,
       setPrioritySkillError,
       "スキルスコアを保存できませんでした。",
+    );
+  };
+
+  const saveTableRankPenalties = async (
+    tableRankPenalties: TableRankPenalties,
+  ): Promise<boolean> => {
+    const validationError = validateTableRankPenalties(tableRankPenalties);
+
+    if (validationError !== null) {
+      setTableRankPenaltyError(
+        "減点幅は0～25の整数で、a ≧ b ≧ c ≧ d ≧ eとなるように設定してください。",
+      );
+      return false;
+    }
+
+    const nextSettings: CustomScoreSettings = {
+      ...customScoreSettings,
+      tableRankPenalties,
+      updatedAt: new Date().toISOString(),
+    };
+
+    return saveScoreSettings(
+      nextSettings,
+      setTableRankPenaltyError,
+      "テーブルランク減点を保存できませんでした。",
     );
   };
 
@@ -578,22 +626,33 @@ function Dashboard() {
               role="tabpanel"
               aria-labelledby="dashboard-tab-score-settings"
             >
-              {scoreSettingsError !== null && (
-                <p className="errorText">{scoreSettingsError}</p>
-              )}
-              <IdealSkillEditor
-                configurations={customScoreSettings.idealSkillConfigurations}
-                errorMessage={idealSkillError}
-                idealMatchScoreError={idealMatchScoreError}
-                onSaveConfigurations={saveIdealSkillConfigurations}
-                onSaveIdealMatchScores={saveIdealMatchScores}
-                settings={customScoreSettings}
-              />
-              <SkillScoreEditor
-                errorMessage={prioritySkillError}
-                onSave={saveSkillScores}
-                skillScores={customScoreSettings.skillScores}
-              />
+              <fieldset
+                className="scoreSettingsFieldset"
+                disabled={isScoreSettingsSaving}
+              >
+                <legend className="visuallyHidden">スコア設定</legend>
+                {scoreSettingsError !== null && (
+                  <p className="errorText">{scoreSettingsError}</p>
+                )}
+                <IdealSkillEditor
+                  configurations={customScoreSettings.idealSkillConfigurations}
+                  errorMessage={idealSkillError}
+                  idealMatchScoreError={idealMatchScoreError}
+                  onSaveConfigurations={saveIdealSkillConfigurations}
+                  onSaveIdealMatchScores={saveIdealMatchScores}
+                  settings={customScoreSettings}
+                />
+                <SkillScoreEditor
+                  errorMessage={prioritySkillError}
+                  onSave={saveSkillScores}
+                  skillScores={customScoreSettings.skillScores}
+                />
+                <TableRankPenaltySettings
+                  errorMessage={tableRankPenaltyError}
+                  onSave={saveTableRankPenalties}
+                  penalties={customScoreSettings.tableRankPenalties}
+                />
+              </fieldset>
             </section>
           )}
 
@@ -1089,6 +1148,128 @@ function IdealMatchScoreEditor({
         一致数スコアを保存
       </button>
       {errorMessage !== null && <p className="errorText">{errorMessage}</p>}
+    </section>
+  );
+}
+
+const TABLE_RANKS = ["a", "b", "c", "d", "e"] as const;
+
+function TableRankPenaltySettings({
+  errorMessage,
+  onSave,
+  penalties,
+}: {
+  errorMessage: string | null;
+  onSave: (penalties: TableRankPenalties) => Promise<boolean>;
+  penalties: TableRankPenalties;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [draftPenalties, setDraftPenalties] = useState<TableRankPenalties>({
+    ...penalties,
+  });
+  const [isSaving, setIsSaving] = useState(false);
+
+  const openDialog = () => {
+    setDraftPenalties({ ...penalties });
+    dialogRef.current?.showModal();
+  };
+
+  const savePenalties = async () => {
+    if (isSaving) {
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      if (await onSave({ ...draftPenalties })) {
+        dialogRef.current?.close();
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <section className="tableRankPenaltySettings" aria-label="共通補正">
+      <div>
+        <h3>共通補正</h3>
+        <p className="mutedText">
+          テーブルランクに応じた減点を、理想構成とスキルスコアの両方へ適用します。
+        </p>
+      </div>
+      <button type="button" onClick={openDialog}>
+        テーブルランク減点を設定
+      </button>
+      <dialog
+        aria-labelledby="table-rank-penalty-dialog-title"
+        className="tableRankPenaltyDialog"
+        onCancel={(event) => {
+          if (isSaving) {
+            event.preventDefault();
+          }
+        }}
+        ref={dialogRef}
+      >
+        <div className="idealMatchScoreDialogHeader">
+          <div>
+            <p className="eyebrow">共通補正</p>
+            <h3 id="table-rank-penalty-dialog-title">テーブルランク減点</h3>
+          </div>
+          <button
+            aria-label="閉じる"
+            className="dialogCloseButton"
+            disabled={isSaving}
+            type="button"
+            onClick={() => dialogRef.current?.close()}
+          >
+            ×
+          </button>
+        </div>
+        <p className="mutedText">
+          各スキルの基礎点から減算します。スコアは0未満になりません。a ≧ b ≧ c ≧
+          d ≧ eの順で設定してください。
+        </p>
+        <div className="tableRankPenaltyGrid">
+          {TABLE_RANKS.map((rank) => (
+            <label className="skillScoreSlider" key={rank}>
+              <span>ランク {rank}</span>
+              <input
+                type="range"
+                min={0}
+                max={25}
+                step={1}
+                disabled={isSaving}
+                value={draftPenalties[rank]}
+                onChange={(event) =>
+                  setDraftPenalties((current) => ({
+                    ...current,
+                    [rank]: Number.parseInt(event.currentTarget.value, 10),
+                  }))
+                }
+              />
+              <output>{draftPenalties[rank]}</output>
+            </label>
+          ))}
+        </div>
+        {errorMessage !== null && <p className="errorText">{errorMessage}</p>}
+        <div className="idealMatchScoreDialogActions">
+          <button
+            type="button"
+            disabled={isSaving}
+            onClick={() => dialogRef.current?.close()}
+          >
+            キャンセル
+          </button>
+          <button
+            type="button"
+            disabled={isSaving}
+            onClick={() => void savePenalties()}
+          >
+            {isSaving ? "保存中..." : "保存"}
+          </button>
+        </div>
+      </dialog>
     </section>
   );
 }

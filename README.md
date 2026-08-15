@@ -220,7 +220,7 @@ finalScore =
 ```text
 idealRouteScore =
   理想構成一致スコア
-  + 理想構成に含まれるスキルの効果量補正
+  - 一致した具体的なスキルのテーブルランク減点合計
 ```
 
 一致判定:
@@ -238,8 +238,7 @@ idealRouteScore =
 
 ```text
 priorityRouteScore =
-  枠別スキルスコアの合計
-  + 効果量補正
+  max(0, 枠別スキルスコア - テーブルランク減点) の合計
 ```
 
 各枠の全スキルへ0～25点を設定します。不要スキル情報はスコアへ影響しません。
@@ -250,15 +249,16 @@ priorityRouteScore =
 
 基本方針:
 
-* e を最も高く評価する
+* a の減点を最も大きく、e の減点を最も小さくする
 * ただし「欲しいスキルの d」は「微妙なスキルの e」より高くなるべき
-* そのため、効果量補正は独立加点ではなく、スキル基礎点に対する倍率補正として扱う
+* 減点幅は0～25でユーザーが調整し、`a ≧ b ≧ c ≧ d ≧ e`を維持する
+* 初期値は`4 / 3 / 2 / 1 / 0`とし、各ルートのスコアは0未満にしない
 
 例:
 
 ```text
-important skill d: 25 * 1.15 = 28.75
-minor skill e:     10 * 1.25 = 12.5
+important skill d: max(0, 25 - 1) = 24
+minor skill e:     max(0, 10 - 0) = 10
 ```
 
 #### Lv評価
@@ -274,7 +274,7 @@ minor skill e:     10 * 1.25 = 12.5
 * rule-based scoring
 * ideal skill set
 * per-skill scores by slot group
-* table rank multiplier
+* configurable table-rank penalties
 * score explanation
 
 #### Phase 2

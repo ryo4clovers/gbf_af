@@ -11,7 +11,7 @@ export type ScoreResult = {
 };
 
 export type ScoreReason = {
-  type: "ideal_match" | "priority_skill" | "table_multiplier";
+  type: "ideal_match" | "priority_skill" | "table_penalty";
   skillKey?: NormalizedSkillKey;
   label: string;
   delta: number;

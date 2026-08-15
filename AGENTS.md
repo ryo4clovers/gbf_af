@@ -161,9 +161,9 @@ Rule/profile based scoring.
 
 User-configurable inputs:
 
-* Ideal skill composition.
-* Skill priority order.
-* Unwanted skills.
+* Ideal skill configurations and match-count scores.
+* Per-skill scores for slots 1–2, slot 3, and slot 4.
+* Shared table-rank penalties.
 
 The evaluator should calculate two positive routes and use the higher one.
 
@@ -182,15 +182,15 @@ Evaluates how close the artifact is to the user's ideal skill composition.
 ```text
 idealRouteScore =
   ideal match score
-  + table multiplier for matched ideal skills
+  - table-rank penalties for concretely matched skills
 ```
 
 Rules:
 
 * Match count is evaluated as 1/4, 2/4, 3/4, or 4/4.
-* Skill slot position is ignored.
-* Unwanted skill penalty should not dominate this route.
-* This route exists because an artifact close to the ideal composition is valuable even if one skill needs rerolling.
+* Slots 1–2 are matched as an unordered pair; slots 3 and 4 match their corresponding slots.
+* Unselected slots are wildcard matches and receive no table-rank penalty.
+* The route score is floored at zero.
 
 ### priorityRouteScore
 
@@ -198,18 +198,14 @@ Evaluates general skill value.
 
 ```text
 priorityRouteScore =
-  skill priority score
-  + table multiplier
-  - unwanted skill penalty
+  sum of max(0, per-skill score - table-rank penalty)
 ```
 
 Rules:
 
-* Higher priority skills score higher.
-* Unwanted skills are penalized.
-* One unwanted skill is a large penalty.
-* Multiple unwanted skills are penalized progressively.
-* Unwanted skill configuration is global, not profile-specific, unless explicitly changed later.
+* Every available skill receives an integer score from 0 to 25 in its slot group.
+* Unwanted-skill metadata does not affect scoring.
+* Slot 4 and unknown table ranks receive no table-rank penalty.
 
 ### Effect Table Handling
 
@@ -217,15 +213,16 @@ Many skills have an effect table rank from `a` to `e` at the same skill level.
 
 Rules:
 
-* `e` is the highest table rank.
+* Rank `a` receives the largest penalty and rank `e` the smallest.
 * A desired skill with rank `d` should score higher than a low-value skill with rank `e`.
-* Therefore, table quality should be a multiplier on skill base score, not a large independent additive score.
+* Users configure integer penalties from 0 to 25 while preserving `a >= b >= c >= d >= e`.
+* The default penalties are `4 / 3 / 2 / 1 / 0`.
 
 Example:
 
 ```text
-important skill d: 30 * 1.15 = 34.5
-minor skill e:     10 * 1.25 = 12.5
+important skill d: max(0, 25 - 1) = 24
+minor skill e:     max(0, 10 - 0) = 10
 ```
 
 ### Skill Level Handling

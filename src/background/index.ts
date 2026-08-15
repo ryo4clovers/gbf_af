@@ -15,6 +15,7 @@ import {
   type UnwantedSkillConfig,
   validateIdealMatchScores,
   validateSkillScores,
+  validateTableRankPenalties,
 } from "../domain/score/customScoreSettings";
 import { validateIdealSkillConfigurations } from "../domain/score/idealSkillConfiguration";
 import type {
@@ -1236,6 +1237,7 @@ function validateCustomScoreSettings(settings: unknown): string | null {
   );
   const idealMatchScores = Reflect.get(settings, "idealMatchScores");
   const skillScores = Reflect.get(settings, "skillScores");
+  const tableRankPenalties = Reflect.get(settings, "tableRankPenalties");
   const updatedAt = Reflect.get(settings, "updatedAt");
   const idealSkillConfigurationError = validateIdealSkillConfigurations(
     idealSkillConfigurations,
@@ -1255,6 +1257,12 @@ function validateCustomScoreSettings(settings: unknown): string | null {
 
   if (skillScoreError !== null) {
     return skillScoreError;
+  }
+
+  const tableRankPenaltyError = validateTableRankPenalties(tableRankPenalties);
+
+  if (tableRankPenaltyError !== null) {
+    return tableRankPenaltyError;
   }
 
   if (!isNonEmptyString(updatedAt)) {

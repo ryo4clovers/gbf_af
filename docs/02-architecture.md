@@ -565,7 +565,7 @@ Evaluates closeness to ideal skill composition.
 ```text
 idealRouteScore =
   ideal match score
-  + table multiplier for matched ideal skills
+  - table-rank penalties for concretely matched skills
 ```
 
 Rules:
@@ -581,8 +581,7 @@ Evaluates general skill value.
 
 ```text
 priorityRouteScore =
-  sum of per-skill scores
-  + table multiplier
+  sum of max(0, per-skill score - table-rank penalty)
 ```
 
 Rules:
@@ -593,11 +592,11 @@ Rules:
 
 ### Effect Table Rank
 
-Table rank should be a multiplier on skill base score.
+Table rank is a configurable fixed penalty on skill base score.
 
 Reason:
 
-* `e` should be valued higher than `a`
+* rank `a` receives a larger penalty than rank `e`
 * but a desired skill with rank `d` should beat a low-value skill with rank `e`
 
 ### Skill Level Baseline

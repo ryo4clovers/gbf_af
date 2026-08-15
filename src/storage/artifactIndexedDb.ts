@@ -6,6 +6,7 @@ import {
   createSkillScoresFromLegacyPriority,
   DEFAULT_CUSTOM_SCORE_SETTINGS,
   DEFAULT_IDEAL_MATCH_SCORES,
+  DEFAULT_TABLE_RANK_PENALTIES,
   DEFAULT_UNWANTED_SKILL_CONFIG,
   migrateLegacyIdealSkillKeys,
   type UnwantedSkillConfig,
@@ -493,6 +494,7 @@ async function getLegacyCustomScoreSettings(
     skillScores: createSkillScoresFromLegacyPriority(
       selectedProfile.skillPriority,
     ),
+    tableRankPenalties: { ...DEFAULT_TABLE_RANK_PENALTIES },
     updatedAt: selectedProfile.updatedAt,
   };
 }

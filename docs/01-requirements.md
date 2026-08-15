@@ -362,7 +362,7 @@ finalScore =
 ```text
 idealRouteScore =
   ideal match score
-  + table multiplier for matched ideal skills
+  - table-rank penalties for concretely matched skills
 ```
 
 要件:
@@ -370,7 +370,7 @@ idealRouteScore =
 * 1/4, 2/4, 3/4, 4/4 の4段階で一致判定する
 * 1～2枠は順不同、3枠と4枠は対応する枠で判定する
 * 未選択枠は一致として扱う
-* 理想構成に含まれるスキルの効果量テーブルを補正する
+* 理想構成で具体的に一致したスキルのテーブルランク減点を差し引く
 
 #### priorityRouteScore
 
@@ -378,8 +378,7 @@ idealRouteScore =
 
 ```text
 priorityRouteScore =
-  sum of per-skill scores
-  + table multiplier
+  sum of max(0, per-skill score - table-rank penalty)
 ```
 
 要件:
@@ -393,9 +392,9 @@ priorityRouteScore =
 要件:
 
 * a〜e の effect table rank を扱えること
-* `e` を最も高く評価する
-* `a` を最も低く評価する
-* table rank は独立加点ではなく、skill base score に対する multiplier として扱う
+* `a` の減点を最も大きく、`e` の減点を最も小さくする
+* 減点幅は0～25で設定し、`a >= b >= c >= d >= e`を維持する
+* 減算後のスコアは0未満にしない
 * 「欲しいスキルの d」が「微妙なスキルの e」より高くなるようにする
 
 #### Skill Level Baseline
