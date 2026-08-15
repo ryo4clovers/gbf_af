@@ -259,27 +259,27 @@ type RawArtifactSkill = {
 
 想定:
 
-* 第1〜第3スキルでは、効果量テーブル a〜e の推定に使える可能性がある
+* 第1〜第3スキルでは、スキルクオリティ A〜E の推定に使える
 * `1` が低く、`5` が高い品質として扱える可能性がある
 * 第4スキルでは `is_max_quality: true` で固定的に見えるケースがあるため、同じ意味として扱わないよう注意する
 
 暫定変換候補:
 
 ```ts
-type TableRank = "a" | "b" | "c" | "d" | "e";
+type SkillQuality = "A" | "B" | "C" | "D" | "E";
 
-function inferTableRankFromQuality(skillQuality: number): TableRank | null {
+function inferSkillQuality(skillQuality: number): SkillQuality | null {
   switch (skillQuality) {
     case 1:
-      return "a";
+      return "E";
     case 2:
-      return "b";
+      return "D";
     case 3:
-      return "c";
+      return "C";
     case 4:
-      return "d";
+      return "B";
     case 5:
-      return "e";
+      return "A";
     default:
       return null;
   }
@@ -289,7 +289,7 @@ function inferTableRankFromQuality(skillQuality: number): TableRank | null {
 注意:
 
 * これは初期仮説であり、実データで検証する
-* 第4スキルは a〜e テーブルではない可能性が高いため、slot別に扱う
+* 第4スキルは A〜E スキルクオリティではない可能性が高いため、slot別に扱う
 * `effect_value` と `level` から逆算検証できる場合は、そちらも利用する
 
 ### `level`
@@ -330,7 +330,7 @@ Custom Score Phase 1 では、評価基準は Lv1 baseline とする。
 
 * UI表示
 * debugging
-* table rank 推定の補助
+* skill quality 推定の補助
 
 注意:
 
@@ -626,15 +626,15 @@ type NormalizedArtifactSkill = {
 };
 ```
 
-### Table Rank
+### Skill Quality
 
 Phase 1 では Lv1 baseline で評価する。
 
 候補:
 
-* `skill_quality` から table rank を推定する
-* `effect_value` と known effect table から table rank を検証する
-* 第4スキルは a〜e 評価から除外、または別評価にする
+* `skill_quality` から skill quality を推定する
+* `effect_value` と known effect table から skill quality を検証する
+* 第4スキルは A〜E 評価から除外、または別評価にする
 
 ## Storage Policy
 

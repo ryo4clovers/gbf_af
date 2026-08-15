@@ -42,7 +42,7 @@ The ideal route measures how close the artifact is to the user's ideal compositi
 ```text
 idealRouteScore =
   ideal match score
-  - table-rank penalties for concretely matched skills
+  - skill-quality penalties for concretely matched skills
 ```
 
 ### Matching Rules
@@ -52,7 +52,7 @@ idealRouteScore =
 * Slots 1 and 2 are matched as an unordered pair.
 * Slots 3 and 4 are matched against their corresponding artifact slots.
 * An unselected skill slot is a wildcard and counts as a match.
-* Wildcard matches do not receive a table-rank penalty.
+* Wildcard matches do not receive a skill-quality penalty.
 * Selected skills are matched using stable keys and normalized API labels.
 * Match levels:
 
@@ -67,7 +67,7 @@ The priority route measures general value using a user-defined score for every s
 
 ```text
 priorityRouteScore =
-  sum of max(0, per-skill score - table-rank penalty)
+  sum of max(0, per-skill score - skill-quality penalty)
 ```
 
 ### Per-Skill Scores
@@ -78,23 +78,23 @@ Users assign an integer score from 0 to 25 to every available skill in these gro
 * Slot 3
 * Slot 4
 
-The four skill scores sum to a maximum base score of 100 before table-rank penalties. Unwanted-skill metadata does not affect score calculation.
+The four skill scores sum to a maximum base score of 100 before skill-quality penalties. Unwanted-skill metadata does not affect score calculation.
 
-## Effect Table Rank
+## Skill Quality
 
-Many skills have an effect table rank from `a` to `e`.
+Many skills have a quality from `A` to `E`, where `A` is highest and `E` is lowest.
 
 Rules:
 
-* Rank `a` receives the largest penalty and rank `e` the smallest.
-* Users configure integer penalties from 0 to 25 with `a >= b >= c >= d >= e`.
+* Quality `A` receives the smallest penalty and quality `E` the largest.
+* Users configure integer penalties from 0 to 25 with `A <= B <= C <= D <= E`.
 * Scores are floored at zero after subtraction.
 
 Example:
 
 ```text
-important skill d: max(0, 25 - 1) = 24
-minor skill e:     max(0, 10 - 0) = 10
+important skill D: max(0, 25 - 3) = 22
+minor skill E:     max(0, 10 - 4) = 6
 ```
 
 ## Skill Level Baseline
@@ -126,17 +126,17 @@ Reasoning:
 * 3/4 match should be highly valuable.
 * 4/4 match should receive the maximum base score.
 * 1/4 and 2/4 matches should not receive a base score.
-* Table-rank penalties are subtracted from concretely matched skills, and the route score is floored at zero.
+* Skill-quality penalties are subtracted from concretely matched skills, and the route score is floored at zero.
 
-### Table-rank Penalties
+### Skill-quality Penalties
 
 ```ts
 const DEFAULT_TABLE_RANK_PENALTIES = {
-  a: 4,
-  b: 3,
+  a: 0,
+  b: 1,
   c: 2,
-  d: 1,
-  e: 0,
+  d: 3,
+  e: 4,
 } as const;
 ```
 
@@ -144,7 +144,7 @@ Reasoning:
 
 * Table quality matters.
 * Skill identity should matter more than table quality.
-* Users may choose integer penalties from 0 to 25 while preserving `a >= b >= c >= d >= e`.
+* Users may choose integer penalties from 0 to 25 while preserving `A <= B <= C <= D <= E`.
 * Unknown ranks, slot 4, and ideal-route wildcards receive no penalty.
 
 ## Conceptual Types
@@ -237,7 +237,7 @@ Responsibilities:
   * Calculates ideal composition score.
 * `evaluatePriorityRoute.ts`
 
-  * Calculates the sum of configured per-skill scores after table-rank penalties.
+  * Calculates the sum of configured per-skill scores after skill-quality penalties.
 * `scoreExplanation.ts`
 
   * Produces UI-friendly explanation reasons.

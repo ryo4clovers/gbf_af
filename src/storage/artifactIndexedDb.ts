@@ -41,6 +41,12 @@ export type SaveScannedArtifactsInput = {
   scannedAt: string;
 };
 
+export type ImportArtifactDataInput = {
+  artifacts: Artifact[];
+  reviews: ArtifactUserReview[];
+  presence: ArtifactPresence[];
+};
+
 export type BackfillLegacyArtifactPresenceResult = {
   artifactCount: number;
   existingPresenceCount: number;
@@ -127,12 +133,70 @@ export async function getScanMetadata(): Promise<ScanMetadata | null> {
 export async function clearAllArtifacts(): Promise<void> {
   const database = await openDatabase();
   const transaction = database.transaction(
-    [ARTIFACT_STORE_NAME, SCAN_METADATA_STORE_NAME],
+    [
+      ARTIFACT_STORE_NAME,
+      SCAN_METADATA_STORE_NAME,
+      SCAN_SESSION_STORE_NAME,
+      ARTIFACT_PRESENCE_STORE_NAME,
+      ARTIFACT_USER_REVIEW_STORE_NAME,
+    ],
     "readwrite",
   );
 
   transaction.objectStore(ARTIFACT_STORE_NAME).clear();
   transaction.objectStore(SCAN_METADATA_STORE_NAME).clear();
+  transaction.objectStore(SCAN_SESSION_STORE_NAME).clear();
+  transaction.objectStore(ARTIFACT_PRESENCE_STORE_NAME).clear();
+  transaction.objectStore(ARTIFACT_USER_REVIEW_STORE_NAME).clear();
+
+  await waitForTransaction(transaction);
+  database.close();
+}
+
+export async function importArtifactData(
+  input: ImportArtifactDataInput,
+): Promise<void> {
+  const database = await openDatabase();
+  const transaction = database.transaction(
+    [
+      ARTIFACT_STORE_NAME,
+      SCAN_METADATA_STORE_NAME,
+      ARTIFACT_USER_REVIEW_STORE_NAME,
+      ARTIFACT_PRESENCE_STORE_NAME,
+    ],
+    "readwrite",
+  );
+
+  const artifactStore = transaction.objectStore(ARTIFACT_STORE_NAME);
+  for (const artifact of input.artifacts) {
+    artifactStore.put(artifact);
+  }
+
+  const reviewStore = transaction.objectStore(ARTIFACT_USER_REVIEW_STORE_NAME);
+  for (const review of input.reviews) {
+    reviewStore.put(review);
+  }
+
+  const presenceStore = transaction.objectStore(ARTIFACT_PRESENCE_STORE_NAME);
+  for (const artifactPresence of input.presence) {
+    presenceStore.put(artifactPresence);
+  }
+
+  const latestScannedAt = input.artifacts.reduce(
+    (latest, artifact) =>
+      artifact.scannedAt.localeCompare(latest) > 0
+        ? artifact.scannedAt
+        : latest,
+    "",
+  );
+  if (latestScannedAt.length > 0) {
+    transaction.objectStore(SCAN_METADATA_STORE_NAME).put({
+      id: LAST_SCAN_METADATA_ID,
+      scannedPage: 0,
+      scannedAt: latestScannedAt,
+      artifactCount: input.artifacts.length,
+    } satisfies ScanMetadata);
+  }
 
   await waitForTransaction(transaction);
   database.close();

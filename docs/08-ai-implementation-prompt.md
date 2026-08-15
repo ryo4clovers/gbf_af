@@ -231,14 +231,14 @@ Evaluates how close the artifact is to the user's ideal skill composition.
 ```text
 idealRouteScore =
   ideal match score
-  - table-rank penalties for concretely matched skills
+  - skill-quality penalties for concretely matched skills
 ```
 
 Rules:
 
 * Evaluate match count as 1/4, 2/4, 3/4, or 4/4.
 * Match slots 1–2 as an unordered pair and slots 3–4 against their corresponding slots.
-* Treat unselected slots as wildcard matches without table-rank penalties.
+* Treat unselected slots as wildcard matches without skill-quality penalties.
 
 ### priorityRouteScore
 
@@ -246,7 +246,7 @@ Evaluates general skill value.
 
 ```text
 priorityRouteScore =
-  sum of max(0, per-skill score - table-rank penalty)
+  sum of max(0, per-skill score - skill-quality penalty)
 ```
 
 Rules:
@@ -256,20 +256,20 @@ Rules:
 
 ### Effect Table Handling
 
-Many skills have an effect table rank from `a` to `e`.
+Many skills have a skill quality from `A` to `E`, where `A` is highest.
 
 Rules:
 
-* Rank `a` receives the largest penalty and rank `e` the smallest.
-* A desired skill with rank `d` should score higher than a low-value skill with rank `e`.
-* Penalties are user-configurable integers from 0 to 25 and satisfy `a >= b >= c >= d >= e`.
+* Quality `A` receives the smallest penalty and quality `E` the largest.
+* A desired skill with quality `D` should score higher than a low-value skill with quality `E`.
+* Penalties are user-configurable integers from 0 to 25 and satisfy `A <= B <= C <= D <= E`.
 * Subtraction is floored at zero.
 
 Example:
 
 ```text
-important skill d: max(0, 25 - 1) = 24
-minor skill e:     max(0, 10 - 0) = 10
+important skill D: max(0, 25 - 3) = 22
+minor skill E:     max(0, 10 - 4) = 6
 ```
 
 ### Skill Level Handling
@@ -436,11 +436,11 @@ export const IDEAL_MATCH_SCORE = {
 } as const;
 
 export const DEFAULT_TABLE_RANK_PENALTIES = {
-  a: 4,
-  b: 3,
+  a: 0,
+  b: 1,
   c: 2,
-  d: 1,
-  e: 0,
+  d: 3,
+  e: 4,
 } as const;
 
 ```
@@ -477,27 +477,27 @@ Prefer:
 * small helper functions
 * explicit fallback behavior
 
-## Table Rank Guidance
+## Skill Quality Guidance
 
-Initial table rank inference may use `skill_quality`.
+Initial skill quality inference may use `skill_quality`.
 
 Candidate mapping:
 
 ```ts
-const QUALITY_TO_TABLE_RANK = {
-  1: "a",
-  2: "b",
-  3: "c",
-  4: "d",
-  5: "e",
+const QUALITY_TO_SKILL_QUALITY = {
+  1: "E",
+  2: "D",
+  3: "C",
+  4: "B",
+  5: "A",
 } as const;
 ```
 
 Be careful:
 
-* Slot 4 may not follow the same a-e table.
+* Slot 4 may not follow the same A-E quality model.
 * Do not overvalue slot 4 using this mapping without validation.
-* If table rank is unknown, use penalty `0`.
+* If skill quality is unknown, use penalty `0`.
 
 ## Score Explanation Requirement
 
@@ -511,8 +511,8 @@ Example:
 Score: 87
 Route: ideal
 + 3/4 ideal match
-+ 通常攻撃ダメージ上限 rank e
-+ 自属性攻撃力 rank d
++ 通常攻撃ダメージ上限 quality E
++ 自属性攻撃力 quality D
 ```
 
 Example:
@@ -520,8 +520,8 @@ Example:
 ```text
 Score: 64
 Route: priority
-+ 通常攻撃ダメージ上限 rank e
-+ 自属性攻撃力 rank d
++ 通常攻撃ダメージ上限 quality E
++ 自属性攻撃力 quality D
 - 不要スキル 1件
 ```
 
@@ -594,7 +594,7 @@ Confirm that the change:
 Start with the smallest useful implementation:
 
 1. Add normalized skill model/types.
-2. Add table rank inference helper.
+2. Add skill quality inference helper.
 3. Add score model/types.
 4. Add evaluator pure functions.
 5. Add small tests or sample-based validation.

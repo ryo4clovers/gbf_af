@@ -2,11 +2,11 @@ import type { ArtifactSkill } from "../artifact";
 import type { TableRank } from "./normalizedSkill";
 
 const QUALITY_TO_TABLE_RANK: Record<number, TableRank> = {
-  1: "a",
-  2: "b",
+  1: "e",
+  2: "d",
   3: "c",
-  4: "d",
-  5: "e",
+  4: "b",
+  5: "a",
 };
 
 export function inferTableRank(
@@ -16,5 +16,9 @@ export function inferTableRank(
     return undefined;
   }
 
-  return QUALITY_TO_TABLE_RANK[skill.quality];
+  return inferSkillQuality(skill.quality);
+}
+
+export function inferSkillQuality(quality: number): TableRank | undefined {
+  return QUALITY_TO_TABLE_RANK[quality];
 }

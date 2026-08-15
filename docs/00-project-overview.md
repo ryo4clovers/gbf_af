@@ -248,7 +248,7 @@ finalScore =
 ```text
 idealRouteScore =
   ideal match score
-  - table-rank penalties for concretely matched skills
+  - skill-quality penalties for concretely matched skills
 ```
 
 一致判定:
@@ -266,27 +266,27 @@ idealRouteScore =
 
 ```text
 priorityRouteScore =
-  sum of max(0, per-skill score - table-rank penalty)
+  sum of max(0, per-skill score - skill-quality penalty)
 ```
 
 各枠グループの全スキルへ0～25点を設定し、不要スキル情報は計算へ使用しません。
 
-#### Effect Table Rank
+#### Skill Quality
 
-第1〜第3スキルの多くは、同じスキルLvでも a〜e の効果量テーブル差があります。
+第1〜第3スキルの多くは、同じスキルLvでも A〜E のスキルクオリティ差があります。Aが最高品質です。
 
 基本方針:
 
-* `a` の減点を最も大きく、`e` の減点を最も小さくする
-* ただし「欲しいスキルの d」は「微妙なスキルの e」より高く評価する
-* 減点幅は0～25でユーザーが調整し、`a >= b >= c >= d >= e`を維持する
+* `A` の減点を最も小さく、`E` の減点を最も大きくする
+* ただし「欲しいスキルの D」は「微妙なスキルの E」より高く評価する
+* 減点幅は0～25でユーザーが調整し、`A <= B <= C <= D <= E`を維持する
 * 理想構成ルートでも、具体的に一致したスキルの減点を基礎スコアから差し引く
 
 例:
 
 ```text
-important skill d: max(0, 25 - 1) = 24
-minor skill e:     max(0, 10 - 0) = 10
+important skill D: max(0, 25 - 3) = 22
+minor skill E:     max(0, 10 - 4) = 6
 ```
 
 #### Skill Level Baseline

@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { convertArtifactRowsToCsv } from "../csv/artifactCsv";
+import {
+  convertArtifactRowsToCsv,
+  parseArtifactRowsFromCsv,
+} from "../csv/artifactCsv";
 import type { Artifact } from "../domain/artifact";
 import type {
   ArtifactUserRating,
@@ -31,6 +34,7 @@ import {
   validateIdealSkillConfigurations,
 } from "../domain/score/idealSkillConfiguration";
 import type { ScoreReason, ScoreResult } from "../domain/score/scoreResult";
+import { inferTableRank } from "../domain/skill/inferTableRank";
 import { sendRuntimeMessage } from "../shared/chromeMessages";
 import { useAppStore } from "../state/appState";
 import {
@@ -52,6 +56,38 @@ type SortKey =
   | "kindOrder";
 type SortDirection = "asc" | "desc";
 type DashboardTab = "list" | "scoreSettings" | "statistics";
+type DashboardIconName =
+  | "add"
+  | "chart"
+  | "delete"
+  | "download"
+  | "filter"
+  | "help"
+  | "list"
+  | "refresh"
+  | "save"
+  | "score"
+  | "sort"
+  | "upload";
+
+const DASHBOARD_ICON_PATHS: Record<DashboardIconName, string> = {
+  add: "M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2Z",
+  chart:
+    "M3 3v18h18v-2H5V3H3Zm4 12h3v2H7v-2Zm0-4h3v3H7v-3Zm5-4h3v10h-3V7Zm5 3h3v7h-3v-7Z",
+  delete:
+    "M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12Zm3.46-7.12 1.41-1.41L12 11.59l1.12-1.12 1.41 1.41L13.41 13l1.12 1.12-1.41 1.41L12 14.41l-1.12 1.12-1.41-1.41L10.59 13l-1.13-1.12ZM15.5 4l-1-1h-5l-1 1H5v2h14V4h-3.5Z",
+  download: "M19 9h-4V3H9v6H5l7 7 7-7ZM5 18v2h14v-2H5Z",
+  filter: "M10 18h4v-2h-4v2ZM3 6v2h18V6H3Zm3 7h12v-2H6v2Z",
+  help: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 17h-2v-2h2v2Zm2.07-7.25-.9.92A3.49 3.49 0 0 0 13 15h-2v-.5c0-.8.32-1.57.88-2.12l1.24-1.26A1.71 1.71 0 0 0 13.5 9 1.5 1.5 0 0 0 12 7.5 1.5 1.5 0 0 0 10.5 9h-2a3.5 3.5 0 1 1 6.57 2.75Z",
+  list: "M3 13h2v-2H3v2Zm0 4h2v-2H3v2Zm0-8h2V7H3v2Zm4 4h14v-2H7v2Zm0 4h14v-2H7v2ZM7 7v2h14V7H7Z",
+  refresh:
+    "M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h8V3l-3.35 3.35Z",
+  save: "M17 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4Zm-5 16a3 3 0 1 1 0-6 3 3 0 0 1 0 6Zm3-10H5V5h10v4Z",
+  score:
+    "M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Zm7.43-2.53c.04-.32.07-.64.07-.97s-.03-.65-.08-.97l2.11-1.65-2-3.46-2.49 1a7.31 7.31 0 0 0-1.68-.98L15 3.27h-4l-.37 2.67c-.61.25-1.17.58-1.69.98l-2.49-1-2 3.46 2.12 1.65c-.05.32-.08.65-.08.97s.03.65.08.97l-2.12 1.65 2 3.46 2.49-1c.52.4 1.08.73 1.69.98l.37 2.67h4l.37-2.67c.61-.25 1.17-.58 1.68-.98l2.49 1 2-3.46-2.11-1.65Z",
+  sort: "M3 18h6v-2H3v2Zm0-5h12v-2H3v2Zm0-7v2h18V6H3Z",
+  upload: "M9 16h6v-6h4l-7-7-7 7h4v6Zm-4 2v2h14v-2H5Z",
+};
 type DashboardTheme = "fantasy" | "cyber";
 
 type ArtifactFilters = {
@@ -87,7 +123,33 @@ type ReviewedArtifactRow = {
 };
 
 const DASHBOARD_THEME_STORAGE_KEY = "gbf-af-dashboard-theme";
+const DASHBOARD_TABS: DashboardTab[] = ["list", "scoreSettings", "statistics"];
+const DASHBOARD_TAB_IDS: Record<DashboardTab, string> = {
+  list: "dashboard-tab-list",
+  scoreSettings: "dashboard-tab-score-settings",
+  statistics: "dashboard-tab-statistics",
+};
 const ATTRIBUTE_ORDER = ["火", "水", "土", "風", "光", "闇"] as const;
+const ATTRIBUTE_ICON_FILE_NAMES: Record<string, string> = {
+  "1": "fire.png",
+  "2": "water.png",
+  "3": "earth.png",
+  "4": "wind.png",
+  "5": "light.png",
+  "6": "dark.png",
+};
+const WEAPON_ICON_FILE_NAMES: Record<string, string> = {
+  "1": "sabre.png",
+  "2": "dagger.png",
+  "3": "spear.png",
+  "4": "axe.png",
+  "5": "staff.png",
+  "6": "gun.png",
+  "7": "melee.png",
+  "8": "bow.png",
+  "9": "harp.png",
+  "10": "katana.png",
+};
 const KIND_ORDER = [
   "kind-1",
   "kind-2",
@@ -159,6 +221,10 @@ function Dashboard() {
   const [statusMessage, setStatusMessage] = useState("Loading artifacts...");
   const [activeDashboardTab, setActiveDashboardTab] =
     useState<DashboardTab>("list");
+  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
+  const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false);
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
   const artifactRows = artifacts.map((artifact) =>
     buildArtifactScoreViewModel({
       artifact,
@@ -279,6 +345,60 @@ function Dashboard() {
       createArtifactCsvFileName(new Date()),
     );
     setStatusMessage(`Exported ${filteredRows.length} artifacts.`);
+  };
+
+  const importCsv = async (file: File) => {
+    try {
+      const imported = parseArtifactRowsFromCsv(await file.text());
+      if (imported.artifacts.length === 0) {
+        setStatusMessage("インポート対象のアーティファクトがありません。");
+        return;
+      }
+      const response = await sendRuntimeMessage({
+        type: "IMPORT_ARTIFACT_DATA",
+        ...imported,
+      });
+      if (!response.ok) {
+        setStatusMessage(response.message);
+        return;
+      }
+      if (response.type !== "IMPORT_ARTIFACT_DATA_RESULT") {
+        setStatusMessage("インポート処理から予期しない応答がありました。");
+        return;
+      }
+      setStatusMessage(`${response.artifactCount}件をインポートしました。`);
+      await loadArtifacts();
+    } catch (error) {
+      setStatusMessage(
+        error instanceof Error
+          ? `CSVをインポートできませんでした: ${error.message}`
+          : "CSVをインポートできませんでした。",
+      );
+    } finally {
+      if (importFileInputRef.current !== null) {
+        importFileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const clearListData = async () => {
+    const artifactResponse = await sendRuntimeMessage({
+      type: "CLEAR_STORED_ARTIFACTS",
+    });
+    if (!artifactResponse.ok) {
+      setStatusMessage(artifactResponse.message);
+      return;
+    }
+    if (artifactResponse.type !== "CLEAR_STORED_ARTIFACTS_RESULT") {
+      setStatusMessage("初期化処理から予期しない応答がありました。");
+      return;
+    }
+    setArtifacts([]);
+    setReviewsByOwnedId({});
+    setPresenceByOwnedId({});
+    setScanState(artifactResponse.scan);
+    setIsResetDialogOpen(false);
+    setStatusMessage("リストデータを初期化しました。");
   };
 
   const saveReview = async (
@@ -437,7 +557,7 @@ function Dashboard() {
 
     if (validationError !== null) {
       setTableRankPenaltyError(
-        "減点幅は0～25の整数で、a ≧ b ≧ c ≧ d ≧ eとなるように設定してください。",
+        "減点幅は0～25の整数で、A ≦ B ≦ C ≦ D ≦ Eとなるように設定してください。",
       );
       return false;
     }
@@ -451,7 +571,7 @@ function Dashboard() {
     return saveScoreSettings(
       nextSettings,
       setTableRankPenaltyError,
-      "テーブルランク減点を保存できませんでした。",
+      "スキルクオリティ減点を保存できませんでした。",
     );
   };
 
@@ -471,16 +591,37 @@ function Dashboard() {
     });
   };
 
+  const handleDashboardTabKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    currentTab: DashboardTab,
+  ) => {
+    const currentIndex = DASHBOARD_TABS.indexOf(currentTab);
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight") {
+      nextIndex = (currentIndex + 1) % DASHBOARD_TABS.length;
+    } else if (event.key === "ArrowLeft") {
+      nextIndex =
+        (currentIndex - 1 + DASHBOARD_TABS.length) % DASHBOARD_TABS.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = DASHBOARD_TABS.length - 1;
+    }
+    if (nextIndex === null) return;
+    event.preventDefault();
+    const nextTab = DASHBOARD_TABS[nextIndex];
+    if (nextTab === undefined) return;
+    setActiveDashboardTab(nextTab);
+    document.getElementById(DASHBOARD_TAB_IDS[nextTab])?.focus();
+  };
+
   return (
     <main className="dashboard">
       <header className="topBar">
-        <div>
-          <h1>GBF Artifact Manager</h1>
-          <p>Local read-only artifact management workspace</p>
-        </div>
+        <h1>GBF AF Manager</h1>
         <div className="topBarActions">
           <label className="themeSelector">
-            Theme
+            <span className="visuallyHidden">テーマ</span>
             <select
               value={dashboardTheme}
               onChange={(event) =>
@@ -492,11 +633,12 @@ function Dashboard() {
             </select>
           </label>
           <button
+            className="iconOnlyButton"
             type="button"
-            onClick={exportCsv}
-            disabled={filteredRows.length === 0}
+            onClick={() => setIsHelpDialogOpen(true)}
+            aria-label="ヘルプ"
           >
-            Export CSV
+            <DashboardIcon name="help" />
           </button>
         </div>
       </header>
@@ -506,18 +648,18 @@ function Dashboard() {
         <div className="statusGrid">
           <div>
             <span>アーティファクト数</span>
-            <strong>{scan.totalCount ?? "-"}</strong>
+            <strong>{artifacts.length}</strong>
           </div>
           <div>
             <span>最終スキャン日時</span>
-            <strong>{scan.lastScannedAt ?? "-"}</strong>
+            <strong>{formatLocalDateTime(scan.lastScannedAt)}</strong>
           </div>
         </div>
       </section>
 
       <section className="workspace" aria-label="Artifact management">
         <div className="panel">
-          <h2>Artifacts</h2>
+          <h2>アーティファクト</h2>
 
           <div
             className="dashboardTabs"
@@ -533,8 +675,11 @@ function Dashboard() {
               role="tab"
               aria-selected={activeDashboardTab === "list"}
               aria-controls="dashboard-tabpanel-list"
+              tabIndex={activeDashboardTab === "list" ? 0 : -1}
               onClick={() => setActiveDashboardTab("list")}
+              onKeyDown={(event) => handleDashboardTabKeyDown(event, "list")}
             >
+              <DashboardIcon name="list" />
               リスト
             </button>
             <button
@@ -546,8 +691,13 @@ function Dashboard() {
               role="tab"
               aria-selected={activeDashboardTab === "scoreSettings"}
               aria-controls="dashboard-tabpanel-score-settings"
+              tabIndex={activeDashboardTab === "scoreSettings" ? 0 : -1}
               onClick={() => setActiveDashboardTab("scoreSettings")}
+              onKeyDown={(event) =>
+                handleDashboardTabKeyDown(event, "scoreSettings")
+              }
             >
+              <DashboardIcon name="score" />
               スコア設定
             </button>
             <button
@@ -559,8 +709,13 @@ function Dashboard() {
               role="tab"
               aria-selected={activeDashboardTab === "statistics"}
               aria-controls="dashboard-tabpanel-statistics"
+              tabIndex={activeDashboardTab === "statistics" ? 0 : -1}
               onClick={() => setActiveDashboardTab("statistics")}
+              onKeyDown={(event) =>
+                handleDashboardTabKeyDown(event, "statistics")
+              }
             >
+              <DashboardIcon name="chart" />
               統計
             </button>
           </div>
@@ -572,30 +727,78 @@ function Dashboard() {
               role="tabpanel"
               aria-labelledby="dashboard-tab-list"
             >
-              <div className="panelHeader">
-                <p>{statusMessage}</p>
-                <button
-                  type="button"
-                  onClick={loadArtifacts}
-                  disabled={isLoading}
-                >
-                  {isLoading ? "Loading..." : "Refresh"}
-                </button>
+              <div className="listToolbar">
+                <div className="listToolbarPrimary">
+                  <button
+                    type="button"
+                    onClick={() => setIsFilterDialogOpen(true)}
+                  >
+                    <DashboardIcon name="filter" />
+                    絞り込み
+                  </button>
+                  <div className="sortControl">
+                    <DashboardIcon name="sort" />
+                    <span className="visuallyHidden">並び替え</span>
+                    <SortSelect sort={sort} onSortChange={setSort} />
+                  </div>
+                  <span className="resultCount">
+                    表示中 {filteredRows.length} / {artifacts.length}
+                  </span>
+                </div>
+                <div className="listToolbarSecondary">
+                  <input
+                    ref={importFileInputRef}
+                    className="visuallyHidden"
+                    type="file"
+                    accept=".csv,text/csv"
+                    onChange={(event) => {
+                      const file = event.currentTarget.files?.[0];
+                      if (file !== undefined) void importCsv(file);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => importFileInputRef.current?.click()}
+                  >
+                    <DashboardIcon name="upload" />
+                    import
+                  </button>
+                  <button
+                    type="button"
+                    onClick={exportCsv}
+                    disabled={filteredRows.length === 0}
+                  >
+                    <DashboardIcon name="download" />
+                    export
+                  </button>
+                  <button
+                    className="dangerButton"
+                    type="button"
+                    onClick={() => setIsResetDialogOpen(true)}
+                    disabled={artifacts.length === 0}
+                  >
+                    <DashboardIcon name="delete" />
+                    初期化
+                  </button>
+                  <button
+                    className="iconOnlyButton"
+                    type="button"
+                    onClick={loadArtifacts}
+                    disabled={isLoading}
+                    aria-label="再読み込み"
+                  >
+                    <DashboardIcon name="refresh" />
+                  </button>
+                </div>
               </div>
-
-              <ArtifactControls
-                artifactCount={artifacts.length}
-                attributeOptions={attributeOptions}
-                filteredCount={filteredRows.length}
-                filters={filters}
-                kindOptions={kindOptions}
-                onFiltersChange={setFilters}
-                onSortChange={setSort}
-                sort={sort}
-              />
+              <p className="statusMessage" role="status">
+                {statusMessage}
+              </p>
 
               {artifacts.length === 0 ? (
-                <p className="emptyState">No stored artifacts found.</p>
+                <p className="emptyState">
+                  保存済みのアーティファクトはありません。
+                </p>
               ) : (
                 <ArtifactTable
                   rows={filteredRows}
@@ -668,6 +871,73 @@ function Dashboard() {
           )}
         </div>
       </section>
+
+      {isFilterDialogOpen && (
+        <DashboardDialog
+          title="絞り込み"
+          onClose={() => setIsFilterDialogOpen(false)}
+        >
+          <ArtifactControls
+            attributeOptions={attributeOptions}
+            filters={filters}
+            kindOptions={kindOptions}
+            onFiltersChange={setFilters}
+          />
+          <div className="dialogActions">
+            <button type="button" onClick={() => setFilters(initialFilters)}>
+              デフォルト
+            </button>
+            <button type="button" onClick={() => setIsFilterDialogOpen(false)}>
+              適用
+            </button>
+          </div>
+        </DashboardDialog>
+      )}
+
+      {isResetDialogOpen && (
+        <DashboardDialog
+          title="リストデータの初期化"
+          onClose={() => setIsResetDialogOpen(false)}
+        >
+          <p>
+            保存済みアーティファクト、評価、コメント、スキャン履歴を削除します。この操作は元に戻せません。
+          </p>
+          <div className="dialogActions">
+            <button type="button" onClick={() => setIsResetDialogOpen(false)}>
+              キャンセル
+            </button>
+            <button
+              className="dangerButton"
+              type="button"
+              onClick={clearListData}
+            >
+              初期化
+            </button>
+          </div>
+        </DashboardDialog>
+      )}
+
+      {isHelpDialogOpen && (
+        <DashboardDialog
+          title="GBF AF Managerについて"
+          onClose={() => setIsHelpDialogOpen(false)}
+        >
+          <div className="helpLinks">
+            <p>
+              GBF AF
+              Managerは、取得したアーティファクト情報をPC内で管理するツールです。
+            </p>
+            <p>
+              問い合わせ先やライセンス、利用規約、プライバシーポリシーは公開準備後にここへ掲載します。
+            </p>
+          </div>
+          <div className="dialogActions">
+            <button type="button" onClick={() => setIsHelpDialogOpen(false)}>
+              閉じる
+            </button>
+          </div>
+        </DashboardDialog>
+      )}
     </main>
   );
 }
@@ -730,6 +1000,72 @@ function StatisticsSummary({ statistics }: { statistics: ArtifactStatistics }) {
       </div>
     </section>
   );
+}
+
+function DashboardIcon({ name }: { name: DashboardIconName }) {
+  return (
+    <svg
+      className="dashboardIcon"
+      aria-hidden="true"
+      focusable="false"
+      viewBox="0 0 24 24"
+    >
+      <path d={DASHBOARD_ICON_PATHS[name]} />
+    </svg>
+  );
+}
+
+function DashboardDialog({
+  children,
+  onClose,
+  title,
+}: {
+  children: React.ReactNode;
+  onClose: () => void;
+  title: string;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (dialog !== null && !dialog.open) dialog.showModal();
+    return () => {
+      if (dialog?.open) dialog.close();
+    };
+  }, []);
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="dashboardDialog"
+      aria-label={title}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+    >
+      <header>
+        <h2>{title}</h2>
+        <button
+          className="dialogClose"
+          type="button"
+          onClick={onClose}
+          aria-label="閉じる"
+        >
+          ×
+        </button>
+      </header>
+      <div className="dialogBody">{children}</div>
+    </dialog>
+  );
+}
+
+function formatLocalDateTime(value: string | null): string {
+  if (value === null) return "未実施";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "未実施";
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
 
 function IdealSkillEditor({
@@ -832,9 +1168,11 @@ function IdealSkillEditor({
             type="button"
             onClick={() => idealMatchScoreDialogRef.current?.showModal()}
           >
+            <DashboardIcon name="score" />
             一致数スコア設定
           </button>
           <button type="button" onClick={addConfiguration}>
+            <DashboardIcon name="add" />
             構成を追加
           </button>
         </div>
@@ -866,7 +1204,7 @@ function IdealSkillEditor({
           <table className="idealConfigurationTable">
             <thead>
               <tr>
-                <th>削除</th>
+                <th>操作</th>
                 <th>No.</th>
                 <th>属性</th>
                 <th>武器種</th>
@@ -882,6 +1220,8 @@ function IdealSkillEditor({
                 <tr key={configuration.id}>
                   <td>
                     <button
+                      className="iconOnlyButton"
+                      aria-label={`理想構成${index + 1}を削除`}
                       type="button"
                       onClick={() => {
                         setIsDirty(true);
@@ -892,7 +1232,7 @@ function IdealSkillEditor({
                         );
                       }}
                     >
-                      削除
+                      <DashboardIcon name="delete" />
                     </button>
                   </td>
                   <td className="idealConfigurationNumber">{index + 1}</td>
@@ -991,7 +1331,12 @@ function IdealSkillEditor({
           </table>
         </div>
       )}
-      <button type="button" onClick={() => void saveConfigurations()}>
+      <button
+        className="scoreSaveButton"
+        type="button"
+        onClick={() => void saveConfigurations()}
+      >
+        <DashboardIcon name="save" />
         理想構成を保存
       </button>
       {errorMessage !== null && <p className="errorText">{errorMessage}</p>}
@@ -1125,7 +1470,7 @@ function IdealMatchScoreEditor({
   return (
     <section className="idealMatchScoreEditor" aria-label="一致数スコア">
       <p className="mutedText">
-        理想スキルの一致数ごとの基礎スコアです。テーブルランク補正は、この基礎スコアへ後から適用されます。
+        理想スキルの一致数ごとの基礎スコアです。スキルクオリティ補正は、この基礎スコアへ後から適用されます。
       </p>
       <div className="idealMatchScoreGrid">
         {([1, 2, 3, 4] as const).map((matchCount) => (
@@ -1193,13 +1538,14 @@ function TableRankPenaltySettings({
   return (
     <section className="tableRankPenaltySettings" aria-label="共通補正">
       <div>
-        <h3>共通補正</h3>
+        <h3>共通補正スコア</h3>
         <p className="mutedText">
-          テーブルランクに応じた減点を、理想構成とスキルスコアの両方へ適用します。
+          スキルクオリティに応じた減点を、理想構成とスキルスコアの両方へ適用します。
         </p>
       </div>
       <button type="button" onClick={openDialog}>
-        テーブルランク減点を設定
+        <DashboardIcon name="score" />
+        スキルクオリティ減点を設定
       </button>
       <dialog
         aria-labelledby="table-rank-penalty-dialog-title"
@@ -1214,7 +1560,7 @@ function TableRankPenaltySettings({
         <div className="idealMatchScoreDialogHeader">
           <div>
             <p className="eyebrow">共通補正</p>
-            <h3 id="table-rank-penalty-dialog-title">テーブルランク減点</h3>
+            <h3 id="table-rank-penalty-dialog-title">スキルクオリティ減点</h3>
           </div>
           <button
             aria-label="閉じる"
@@ -1227,13 +1573,13 @@ function TableRankPenaltySettings({
           </button>
         </div>
         <p className="mutedText">
-          各スキルの基礎点から減算します。スコアは0未満になりません。a ≧ b ≧ c ≧
-          d ≧ eの順で設定してください。
+          各スキルの基礎点から減算します。スコアは0未満になりません。A ≦ B ≦ C ≦
+          D ≦ Eの順で設定してください。
         </p>
         <div className="tableRankPenaltyGrid">
           {TABLE_RANKS.map((rank) => (
             <label className="skillScoreSlider" key={rank}>
-              <span>ランク {rank}</span>
+              <span>クオリティ {rank.toUpperCase()}</span>
               <input
                 type="range"
                 min={0}
@@ -1332,27 +1678,60 @@ function SkillScoreEditor({
     }
   };
 
+  const handleSkillScoreTabKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    currentIndex: number,
+  ) => {
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight") {
+      nextIndex = (currentIndex + 1) % SKILL_SCORE_TABS.length;
+    } else if (event.key === "ArrowLeft") {
+      nextIndex =
+        (currentIndex - 1 + SKILL_SCORE_TABS.length) % SKILL_SCORE_TABS.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = SKILL_SCORE_TABS.length - 1;
+    }
+
+    if (nextIndex === null) return;
+    event.preventDefault();
+    const nextTab = SKILL_SCORE_TABS[nextIndex];
+    if (nextTab === undefined) return;
+    setActiveTab(nextTab.key);
+    document.getElementById(`skill-score-tab-${nextTab.key}`)?.focus();
+  };
+
   return (
     <section className="skillScoreEditor" aria-label="スキルスコア">
-      <h3>スキルスコア</h3>
+      <h3>スキル別スコア</h3>
       <p className="mutedText">
         各スキルの基礎点を0～25で設定します。4枠の合計基礎点は最大100です。
       </p>
       <div className="skillScoreTabs" role="tablist" aria-label="スキル枠">
-        {SKILL_SCORE_TABS.map((tab) => (
+        {SKILL_SCORE_TABS.map((tab, index) => (
           <button
+            id={`skill-score-tab-${tab.key}`}
             className={tab.key === activeTab ? "active" : undefined}
             key={tab.key}
             type="button"
             role="tab"
             aria-selected={tab.key === activeTab}
+            aria-controls={`skill-score-panel-${tab.key}`}
+            tabIndex={tab.key === activeTab ? 0 : -1}
             onClick={() => setActiveTab(tab.key)}
+            onKeyDown={(event) => handleSkillScoreTabKeyDown(event, index)}
           >
             {tab.label}
           </button>
         ))}
       </div>
-      <div className="skillScoreGrid" role="tabpanel">
+      <div
+        id={`skill-score-panel-${activeTab}`}
+        className="skillScoreGrid"
+        role="tabpanel"
+        aria-labelledby={`skill-score-tab-${activeTab}`}
+      >
         {activeOptions.map((option) => {
           const score =
             activeEntries.find((entry) => entry.skillKey === option.key)
@@ -1380,10 +1759,12 @@ function SkillScoreEditor({
         })}
       </div>
       <button
+        className="scoreSaveButton"
         type="button"
         disabled={isSaving}
         onClick={() => void saveScores()}
       >
+        <DashboardIcon name="save" />
         {isSaving ? "保存中..." : "スキルスコアを保存"}
       </button>
       {errorMessage !== null && <p className="errorText">{errorMessage}</p>}
@@ -1541,23 +1922,15 @@ function SkillStatisticsTable({
 }
 
 function ArtifactControls({
-  artifactCount,
   attributeOptions,
-  filteredCount,
   filters,
   kindOptions,
   onFiltersChange,
-  onSortChange,
-  sort,
 }: {
-  artifactCount: number;
   attributeOptions: string[];
-  filteredCount: number;
   filters: ArtifactFilters;
   kindOptions: string[];
   onFiltersChange: (filters: ArtifactFilters) => void;
-  onSortChange: (sort: ArtifactSort) => void;
-  sort: ArtifactSort;
 }) {
   return (
     <section className="tableControls" aria-label="Artifact filters">
@@ -1688,37 +2061,41 @@ function ArtifactControls({
             <option value="possiblyDeleted">解体済み?</option>
           </select>
         </label>
-
-        <label>
-          並び替え
-          <select
-            value={`${sort.key}:${sort.direction}`}
-            onChange={(event) => {
-              const [key, direction] = event.currentTarget.value.split(":");
-              onSortChange({
-                key: key as SortKey,
-                direction: direction as SortDirection,
-              });
-            }}
-          >
-            <option value="totalScore:desc">ゲーム内スコア降順</option>
-            <option value="totalScore:asc">ゲーム内スコア昇順</option>
-            <option value="ownedId:desc">最近入手した順</option>
-            <option value="ownedId:asc">古い順</option>
-            <option value="rating:asc">評価昇順</option>
-            <option value="rating:desc">評価降順</option>
-            <option value="customScore:desc">カスタムスコア降順</option>
-            <option value="customScore:asc">カスタムスコア昇順</option>
-            <option value="attributeOrder:asc">属性順(火→闇)</option>
-            <option value="kindOrder:asc">武器種順(剣→刀)</option>
-          </select>
-        </label>
-      </div>
-
-      <div className="resultCount">
-        表示中 {filteredCount} / {artifactCount}
       </div>
     </section>
+  );
+}
+
+function SortSelect({
+  onSortChange,
+  sort,
+}: {
+  onSortChange: (sort: ArtifactSort) => void;
+  sort: ArtifactSort;
+}) {
+  return (
+    <select
+      aria-label="並び替え"
+      value={`${sort.key}:${sort.direction}`}
+      onChange={(event) => {
+        const [key, direction] = event.currentTarget.value.split(":");
+        onSortChange({
+          key: key as SortKey,
+          direction: direction as SortDirection,
+        });
+      }}
+    >
+      <option value="totalScore:desc">ゲーム内スコア降順</option>
+      <option value="totalScore:asc">ゲーム内スコア昇順</option>
+      <option value="ownedId:desc">最近入手した順</option>
+      <option value="ownedId:asc">古い順</option>
+      <option value="rating:asc">評価昇順</option>
+      <option value="rating:desc">評価降順</option>
+      <option value="customScore:desc">カスタムスコア降順</option>
+      <option value="customScore:asc">カスタムスコア昇順</option>
+      <option value="attributeOrder:asc">属性順(火→闇)</option>
+      <option value="kindOrder:asc">武器種順(剣→刀)</option>
+    </select>
   );
 }
 
@@ -1737,24 +2114,19 @@ function ArtifactTable({
   ) => void;
 }) {
   return (
-    <div className="tableScroller">
+    <div className="tableScroller artifactTableScroller">
       <table>
         <thead>
           <tr>
-            <th>所持ID</th>
-            <th>アーティファクト名</th>
-            <th>属性</th>
-            <th>武器種</th>
-            <th>レベル</th>
-            <th>ゲーム内スコア</th>
-            <th>カスタムスコア</th>
-            <th>評価</th>
-            <th>メモ</th>
-            <th>最終確認日</th>
-            <th>解体済み?</th>
-            <th>お気に入り</th>
-            <th>装備キャラ</th>
+            <th>ID</th>
+            <th aria-label="アイコン" />
+            <th>Lv</th>
             <th>スキル</th>
+            <th>スコア</th>
+            <th>評価</th>
+            <th>コメント</th>
+            <th>latest</th>
+            <th>装備キャラ</th>
           </tr>
         </thead>
         <tbody>
@@ -1764,19 +2136,30 @@ function ArtifactTable({
             return (
               <tr key={artifact.ownedId}>
                 <td>{artifact.ownedId}</td>
-                <td>{artifact.name}</td>
-                <td>{artifact.attribute.label}</td>
-                <td>{formatKindLabel(artifact.kind.label)}</td>
                 <td>
-                  {artifact.level}/{artifact.maxLevel}
+                  <ArtifactThumbnail artifact={artifact} />
                 </td>
-                <td>{artifact.gameScore.total}</td>
+                <td>{artifact.level}</td>
+                <td>
+                  <ul className="skillList">
+                    {artifact.skills.map((skill) => (
+                      <li key={skill.slot}>
+                        {formatSkillQuality(skill)}
+                        {skill.name} <small>{skill.effectValueText}</small>
+                      </li>
+                    ))}
+                  </ul>
+                </td>
                 <td>
                   <CustomScoreCell score={row.customScore} />
+                  <small className="gameScore">
+                    game {artifact.gameScore.total}
+                  </small>
                 </td>
                 <td>
                   <select
                     className="ratingSelect"
+                    aria-label={`${artifact.ownedId}の評価`}
                     value={review?.rating ?? 0}
                     onChange={(event) =>
                       onRatingChange(
@@ -1788,12 +2171,12 @@ function ArtifactTable({
                       )
                     }
                   >
-                    <option value={0}>0</option>
-                    <option value={1}>1</option>
-                    <option value={2}>2</option>
-                    <option value={3}>3</option>
-                    <option value={4}>4</option>
-                    <option value={5}>5</option>
+                    <option value={0}>☆☆☆☆☆</option>
+                    <option value={1}>★☆☆☆☆</option>
+                    <option value={2}>★★☆☆☆</option>
+                    <option value={3}>★★★☆☆</option>
+                    <option value={4}>★★★★☆</option>
+                    <option value={5}>★★★★★</option>
                   </select>
                 </td>
                 <td>
@@ -1807,24 +2190,61 @@ function ArtifactTable({
                     }
                   />
                 </td>
-                <td>{row.presence?.lastSeenAt ?? "-"}</td>
-                <td>{formatBooleanLabel(row.presence?.isPossiblyDeleted)}</td>
-                <td>{formatBooleanLabel(artifact.isLocked)}</td>
+                <td>{formatLocalDateTime(row.presence?.lastSeenAt ?? null)}</td>
                 <td>{artifact.equippedCharacter?.name ?? "-"}</td>
-                <td>
-                  <ul className="skillList">
-                    {artifact.skills.map((skill) => (
-                      <li key={skill.slot}>
-                        {skill.name}: {skill.effectValueText}
-                      </li>
-                    ))}
-                  </ul>
-                </td>
               </tr>
             );
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function ArtifactThumbnail({ artifact }: { artifact: Artifact }) {
+  const [hasImageError, setHasImageError] = useState(false);
+  const imageUrl = chrome.runtime.getURL(
+    `artifacts/${artifact.artifactTypeId}.png`,
+  );
+  const attributeIconFileName =
+    ATTRIBUTE_ICON_FILE_NAMES[artifact.attribute.raw];
+  const weaponIconFileName = WEAPON_ICON_FILE_NAMES[artifact.kind.raw];
+
+  return (
+    <div
+      className="artifactThumbnail"
+      title={`${artifact.attribute.label} / ${formatKindLabel(artifact.kind.label)} / ${artifact.name}`}
+    >
+      {hasImageError ? (
+        <DashboardIcon name="score" />
+      ) : (
+        <img src={imageUrl} alt="" onError={() => setHasImageError(true)} />
+      )}
+      {attributeIconFileName === undefined ? (
+        <span className="attributeBadge">{artifact.attribute.label}</span>
+      ) : (
+        <span className="attributeBadge attributeImageBadge">
+          <img
+            src={chrome.runtime.getURL(`elements/${attributeIconFileName}`)}
+            alt={artifact.attribute.label}
+          />
+        </span>
+      )}
+      {weaponIconFileName === undefined ? (
+        <span className="kindBadge">
+          {formatKindLabel(artifact.kind.label).slice(0, 1)}
+        </span>
+      ) : (
+        <span className="kindBadge weaponImageBadge">
+          <img
+            src={chrome.runtime.getURL(`weapons/${weaponIconFileName}`)}
+            alt={formatKindLabel(artifact.kind.label)}
+          />
+        </span>
+      )}
+      {(artifact.isLocked || artifact.isMarkedUnnecessaryInGame) && (
+        <span className="stateBadge">{artifact.isLocked ? "★" : "!"}</span>
+      )}
     </div>
   );
 }
@@ -2100,8 +2520,11 @@ function formatKindLabel(kind: string): string {
   return KIND_LABELS[kind] ?? kind;
 }
 
-function formatBooleanLabel(value: boolean | undefined): string {
-  return value ? "はい" : "いいえ";
+function formatSkillQuality(
+  skill: Pick<Artifact["skills"][number], "slot" | "quality">,
+): string {
+  const quality = inferTableRank(skill);
+  return quality === undefined ? "" : `${quality.toUpperCase()}. `;
 }
 
 function formatScoreRouteLabel(route: ScoreResult["selectedRoute"]): string {

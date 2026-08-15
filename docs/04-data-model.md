@@ -435,26 +435,26 @@ GBF response の `skill_quality`。
 
 * UI表示
 * CSV出力
-* table rank 推定
+* skill quality 推定
 * debugging
 
-暫定 table rank 推定:
+暫定 skill quality 推定:
 
 ```ts
-type TableRank = "a" | "b" | "c" | "d" | "e";
+type SkillQuality = "A" | "B" | "C" | "D" | "E";
 
-function inferTableRankFromQuality(quality: number): TableRank | null {
+function inferSkillQuality(quality: number): SkillQuality | null {
   switch (quality) {
     case 1:
-      return "a";
+      return "E";
     case 2:
-      return "b";
+      return "D";
     case 3:
-      return "c";
+      return "C";
     case 4:
-      return "d";
+      return "B";
     case 5:
-      return "e";
+      return "A";
     default:
       return null;
   }
@@ -463,7 +463,7 @@ function inferTableRankFromQuality(quality: number): TableRank | null {
 
 注意:
 
-* 第4スキルは a〜e テーブルではない可能性が高い
+* 第4スキルは A〜E スキルクオリティではない可能性が高い
 * `effectValueText` と skill catalog から検証できる場合は併用する
 * quality だけに強く依存しすぎない
 
@@ -999,11 +999,11 @@ const DEFAULT_IDEAL_MATCH_SCORES = {
 
 ```ts
 const DEFAULT_TABLE_RANK_PENALTIES = {
-  a: 4,
-  b: 3,
+  a: 0,
+  b: 1,
   c: 2,
-  d: 1,
-  e: 0,
+  d: 3,
+  e: 4,
 } as const;
 ```
 
@@ -1067,8 +1067,8 @@ Phase 1 では、まず `skill_quality` ベースを優先し、必要に応じ�
 
 注意:
 
-* 第4スキルは a〜e rank ではない可能性が高い
-* slot別に table rank の扱いを変える
+* 第4スキルは A〜E quality ではない可能性が高い
+* slot別に skill quality の扱いを変える
 * rank 不明時は減点`0`として扱う
 
 ## Custom Score Evaluation
@@ -1088,7 +1088,7 @@ finalScore =
 ```text
 idealRouteScore =
   ideal match score
-  - table-rank penalties for concretely matched skills
+  - skill-quality penalties for concretely matched skills
 ```
 
 仕様:
@@ -1102,7 +1102,7 @@ idealRouteScore =
 
 ```text
 priorityRouteScore =
-  sum of max(0, per-skill score - table-rank penalty)
+  sum of max(0, per-skill score - skill-quality penalty)
 ```
 
 仕様:

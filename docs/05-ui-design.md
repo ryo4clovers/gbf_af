@@ -19,7 +19,7 @@ Popup は Side Panel へ移行済みのため、現在の主要UIとしては扱
 - Dashboard で保存済み artifact を管理する
 - rating / memo をローカルに保存する
 - statistics を表示する
-- CSV export を提供する
+- CSV export と、同CSVを使ったローカルデータ移行用 import を提供する
 - custom score の表示・設定を将来的に提供する
 
 ### 行わないこと
@@ -487,7 +487,7 @@ Artifact Table
 * quality
 * effect value
 * score category
-* future table rank
+* future skill quality
 * future normalized key
 
 表示例:
@@ -552,6 +552,8 @@ S4 回復アビリティ使用時... q1 4%
 ### 目的
 
 保存済み artifact をローカル CSV として出力する。
+
+The exported CSV keeps human-readable spreadsheet columns and adds migration JSON columns that fully preserve artifacts, reviews, and presence records. Import validates these migration columns and merges records into local storage by `ownedId`.
 
 ### UI
 
@@ -681,18 +683,18 @@ HP                  [------●---] 15
 * スライダー値を数値でも併記する
 * 保存時に全スキルの値をまとめて永続化する
 
-### Shared Table-rank Penalty Settings
+### Shared Skill-quality Penalty Settings
 
 目的:
 
-理想構成ルートとスキルスコアルートに共通するテーブルランク減点を設定する。
+理想構成ルートとスキルスコアルートに共通するスキルクオリティ減点を設定する。
 
 仕様:
 
 * スコア設定画面の独立した「共通補正」エリアからDialogを開く
-* `a`～`e`の減点幅を0～25の整数スライダーで調整する
-* `a >= b >= c >= d >= e`を保存時に検証する
-* 初期値は`4 / 3 / 2 / 1 / 0`とする
+* `A`～`E`の減点幅を0～25の整数スライダーで調整する
+* `A <= B <= C <= D <= E`を保存時に検証する
+* 初期値は`0 / 1 / 2 / 3 / 4`とする
 * 減算後の各スコアは0未満にしない
 * 4枠、ランク不明、理想構成の未選択枠には減点しない
 
@@ -754,15 +756,15 @@ Priority Route: 61
 
 ```text
 + 3/4 ideal match
-+ 通常攻撃ダメージ上限 rank e
-+ 自属性攻撃力 rank d
++ 通常攻撃ダメージ上限 quality E
++ 自属性攻撃力 quality D
 ```
 
 または:
 
 ```text
 + 通常攻撃ダメージ上限 skill score 25
-+ 通常攻撃ダメージ上限 rank e
++ 通常攻撃ダメージ上限 quality E
 ```
 
 方針:

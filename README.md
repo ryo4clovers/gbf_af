@@ -22,7 +22,7 @@ Granblue Fantasy のアーティファクト(AF)管理を目的とした Chrome 
 - GBF ページ自身が発行した `/rest/artifact/list/{page}` のレスポンスを観測する
 - 観測したレスポンスを content bridge 経由で background service worker に渡す
 - 正規化したアーティファクト情報を IndexedDB に保存する
-- ローカルデータを Side Panel / Dashboard で表示、検索、並び替え、CSV出力する
+- ローカルデータを Side Panel / Dashboard で表示、検索、並び替え、CSV出力・移行する
 - ユーザが付与した rating / memo / custom score settings をローカル保存する
 
 ## 現在の構成
@@ -58,7 +58,7 @@ Popup は現在使用していません。
 - アーティファクト一覧
 - フィルタ
 - ソート
-- CSV export
+- CSV export and import for local data migration
 - statistics summary
 - rating
 - memo
@@ -207,7 +207,7 @@ finalScore =
 ```text
 idealRouteScore =
   理想構成一致スコア
-  - 一致した具体的なスキルのテーブルランク減点合計
+  - 一致した具体的なスキルのスキルクオリティ減点合計
 ```
 
 一致判定:
@@ -225,27 +225,27 @@ idealRouteScore =
 
 ```text
 priorityRouteScore =
-  max(0, 枠別スキルスコア - テーブルランク減点) の合計
+  max(0, 枠別スキルスコア - スキルクオリティ減点) の合計
 ```
 
 各枠の全スキルへ0～25点を設定します。不要スキル情報はスコアへ影響しません。
 
-#### 効果量テーブル補正
+#### スキルクオリティ補正
 
-アーティファクトの第1〜第3スキルの多くは、同じ skill level でも a〜e の効果量テーブル差があります。
+アーティファクトの第1〜第3スキルの多くは、同じ skill level でも A〜E のスキルクオリティ差があります。Aが最高品質、Eが最低品質です。
 
 基本方針:
 
-* a の減点を最も大きく、e の減点を最も小さくする
-* ただし「欲しいスキルの d」は「微妙なスキルの e」より高くなるべき
-* 減点幅は0～25でユーザーが調整し、`a ≧ b ≧ c ≧ d ≧ e`を維持する
-* 初期値は`4 / 3 / 2 / 1 / 0`とし、各ルートのスコアは0未満にしない
+* A の減点を最も小さく、E の減点を最も大きくする
+* `A <= B <= C <= D <= E` の順序を維持する
+* 減点幅は0～25でユーザーが調整し、`A ≦ B ≦ C ≦ D ≦ E`を維持する
+* 初期値は`0 / 1 / 2 / 3 / 4`とし、各ルートのスコアは0未満にしない
 
 例:
 
 ```text
-important skill d: max(0, 25 - 1) = 24
-minor skill e:     max(0, 10 - 0) = 10
+important skill D: max(0, 25 - 3) = 22
+minor skill E:     max(0, 10 - 4) = 6
 ```
 
 #### Lv評価
@@ -261,7 +261,7 @@ minor skill e:     max(0, 10 - 0) = 10
 * rule-based scoring
 * ideal skill set
 * per-skill scores by slot group
-* configurable table-rank penalties
+* configurable skill-quality penalties
 * score explanation
 
 #### Phase 2

@@ -1082,3 +1082,539 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* Score settings: three clearly separated editing surfaces. */
+.scoreSettingsFieldset {
+  display: grid;
+  gap: 18px;
+}
+
+.scoreSettingsFieldset > .idealSkillEditor,
+.scoreSettingsFieldset > .skillScoreEditor,
+.scoreSettingsFieldset > .tableRankPenaltySettings {
+  position: relative;
+  gap: 14px;
+  margin: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 18px;
+  background: color-mix(in srgb, var(--color-surface-raised) 76%, transparent);
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--color-accent) 72%, transparent);
+}
+
+.scoreSettingsFieldset > section h3 {
+  font-size: 18px;
+  letter-spacing: 0.035em;
+}
+
+.idealSkillEditorHeader {
+  align-items: center;
+}
+
+.idealSkillEditorActions button,
+.tableRankPenaltySettings > button,
+.scoreSaveButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.idealConfigurationTableScroller {
+  margin-top: 2px;
+  background: var(--color-surface);
+}
+
+.idealConfigurationTable {
+  min-width: 1450px;
+}
+
+.idealConfigurationTable th:nth-child(1) {
+  width: 54px;
+  text-align: center;
+}
+
+.idealConfigurationTable th:nth-child(2) {
+  width: 44px;
+}
+
+.idealConfigurationTable th:nth-child(3) {
+  width: 96px;
+}
+
+.idealConfigurationTable th:nth-child(4) {
+  width: 110px;
+}
+
+.idealConfigurationTable th:nth-child(5),
+.idealConfigurationTable th:nth-child(6) {
+  width: 160px;
+}
+
+.idealConfigurationTable th:nth-child(7) {
+  width: 210px;
+}
+
+.idealConfigurationTable th:nth-child(8) {
+  width: 310px;
+}
+
+.idealConfigurationTable th:nth-child(9) {
+  width: 220px;
+}
+
+.idealConfigurationTable td:first-child {
+  text-align: center;
+}
+
+.idealConfigurationTable td:first-child .iconOnlyButton {
+  color: var(--color-danger);
+}
+
+.scoreSaveButton {
+  justify-self: start;
+  min-width: 150px;
+}
+
+.skillScoreTabs {
+  gap: 3px;
+  border-bottom: 1px solid var(--color-border-strong);
+  padding: 0 0 0 8px;
+}
+
+.skillScoreTabs button {
+  min-width: 130px;
+  margin-bottom: -1px;
+  border-radius: 7px 7px 0 0;
+  box-shadow: none;
+}
+
+.skillScoreTabs button.active {
+  border-color: var(--color-border-strong);
+  border-bottom-color: var(--color-surface);
+  background: var(--color-surface);
+}
+
+.skillScoreGrid {
+  gap: 7px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  padding: 12px;
+  background: var(--color-surface);
+}
+
+.skillScoreEditor .skillScoreSlider {
+  border-color: color-mix(in srgb, var(--color-border) 75%, transparent);
+  background: color-mix(in srgb, var(--color-surface-muted) 72%, transparent);
+}
+
+.skillScoreSlider output {
+  display: grid;
+  place-items: center;
+  min-width: 30px;
+  min-height: 28px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-surface);
+}
+
+.scoreSettingsFieldset > .tableRankPenaltySettings {
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 74px;
+}
+
+:root[data-theme="cyber"] .scoreSettingsFieldset > .idealSkillEditor,
+:root[data-theme="cyber"] .scoreSettingsFieldset > .skillScoreEditor,
+:root[data-theme="cyber"] .scoreSettingsFieldset > .tableRankPenaltySettings {
+  box-shadow:
+    inset 3px 0 0 color-mix(in srgb, var(--color-accent) 82%, transparent),
+    0 0 22px rgba(73, 214, 255, 0.035);
+}
+
+@media (max-width: 800px) {
+  .scoreSettingsFieldset > .idealSkillEditor,
+  .scoreSettingsFieldset > .skillScoreEditor,
+  .scoreSettingsFieldset > .tableRankPenaltySettings {
+    padding: 14px;
+  }
+
+  .skillScoreTabs button {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-inline: 8px;
+  }
+
+  .scoreSettingsFieldset > .tableRankPenaltySettings {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Dashboard shell based on the compact browser-tab management layout. */
+.dashboard {
+  width: min(1520px, 100%);
+  margin: 0 auto;
+}
+
+.topBar {
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 14px;
+}
+
+.topBar h1::before {
+  content: none;
+}
+
+.topBarActions {
+  align-items: center;
+}
+
+.themeSelector {
+  min-width: 130px;
+}
+
+.iconOnlyButton {
+  display: inline-grid;
+  place-items: center;
+  min-width: 38px;
+  padding: 8px;
+}
+
+.dashboardIcon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  fill: currentColor;
+}
+
+.statusGrid {
+  max-width: 720px;
+}
+
+.statusGrid div {
+  min-height: 62px;
+}
+
+.panel {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.panel::before,
+.panel::after {
+  content: none;
+}
+
+.panel > h2 {
+  margin: 0 0 8px;
+}
+
+.dashboardTabs {
+  gap: 3px;
+  margin: 0;
+  padding-left: 14px;
+  overflow: hidden;
+}
+
+.dashboardTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: -1px;
+  border: 1px solid var(--color-border);
+  border-bottom-color: transparent;
+  border-radius: 8px 8px 0 0;
+  padding: 9px 16px;
+  background: var(--color-surface-muted);
+}
+
+.dashboardTab.active {
+  z-index: 2;
+  border-color: var(--color-border-strong);
+  border-bottom-color: var(--color-surface);
+  color: var(--color-accent-strong);
+  background: var(--color-surface);
+}
+
+.dashboardTab.active::after {
+  content: none;
+}
+
+.dashboardTabPanel {
+  min-height: 480px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  padding: 18px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-panel);
+}
+
+.listToolbar,
+.listToolbarPrimary,
+.listToolbarSecondary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.listToolbar {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.listToolbar button,
+.sortControl {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.sortControl {
+  min-width: 220px;
+}
+
+.sortControl select {
+  min-width: 190px;
+}
+
+.listToolbar .resultCount {
+  margin: 0 0 0 6px;
+  white-space: nowrap;
+}
+
+.statusMessage {
+  min-height: 18px;
+  font-size: 12px;
+}
+
+.dangerButton {
+  color: var(--color-danger);
+}
+
+.dashboardDialog::backdrop {
+  background: rgba(15, 26, 38, 0.55);
+  backdrop-filter: blur(3px);
+}
+
+.dashboardDialog {
+  width: min(860px, 100%);
+  max-height: calc(100vh - 48px);
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  box-shadow: 0 24px 70px rgba(15, 26, 38, 0.35);
+  overflow: auto;
+}
+
+.dashboardDialog > header {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--color-border);
+  padding: 14px 18px;
+  background: var(--color-surface);
+}
+
+.dashboardDialog h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.dialogClose {
+  border: 0;
+  padding: 4px 9px;
+  font-size: 24px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dialogBody {
+  padding: 18px;
+}
+
+.dialogBody .tableControls {
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.dialogBody .filterGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.helpLinks {
+  line-height: 1.8;
+}
+
+.dashboardTabPanel .artifactTableScroller table {
+  min-width: 1040px;
+}
+
+.dashboardTabPanel .artifactTableScroller th:nth-child(1) {
+  width: 76px;
+}
+
+.dashboardTabPanel .artifactTableScroller th:nth-child(2) {
+  width: 68px;
+}
+
+.dashboardTabPanel .artifactTableScroller th:nth-child(3) {
+  width: 42px;
+}
+
+.dashboardTabPanel .artifactTableScroller th:nth-child(4) {
+  min-width: 280px;
+}
+
+.dashboardTabPanel .artifactTableScroller th:nth-child(5) {
+  width: 110px;
+}
+
+.artifactThumbnail {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  color: var(--color-accent-strong);
+  background: linear-gradient(145deg, var(--color-surface-raised), var(--color-surface-muted));
+}
+
+.artifactThumbnail > .dashboardIcon {
+  width: 28px;
+  height: 28px;
+  opacity: 0.62;
+}
+
+.artifactThumbnail > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 5px;
+  object-fit: cover;
+}
+
+.attributeBadge,
+.kindBadge,
+.stateBadge {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 50%;
+  color: #fff;
+  background: var(--color-accent-secondary);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.attributeBadge {
+  left: -5px;
+  bottom: -5px;
+}
+
+.attributeImageBadge {
+  width: 23px;
+  height: 23px;
+  border: 0;
+  background: transparent;
+}
+
+.attributeImageBadge img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.kindBadge {
+  right: -5px;
+  bottom: -5px;
+  background: #627d91;
+}
+
+.weaponImageBadge {
+  width: 23px;
+  height: 23px;
+  border: 0;
+  background: transparent;
+}
+
+.weaponImageBadge img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.stateBadge {
+  top: -5px;
+  left: -5px;
+  color: #273646;
+  background: #f2ce58;
+}
+
+.ratingSelect {
+  min-width: 112px;
+  color: #b7811f;
+}
+
+.gameScore {
+  display: block;
+  margin-top: 5px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.skillList small {
+  color: var(--color-text-muted);
+}
+
+:root[data-theme="cyber"] .dashboardTab.active {
+  border-bottom-color: var(--color-surface);
+}
+
+@media (max-width: 800px) {
+  .listToolbar,
+  .listToolbarPrimary,
+  .listToolbarSecondary {
+    align-items: stretch;
+  }
+
+  .listToolbar,
+  .listToolbarPrimary {
+    flex-direction: column;
+  }
+
+  .listToolbarSecondary {
+    flex-wrap: wrap;
+  }
+
+  .sortControl,
+  .sortControl select {
+    width: 100%;
+  }
+
+  .dialogBody .filterGrid {
+    grid-template-columns: 1fr;
+  }
+}

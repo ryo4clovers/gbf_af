@@ -236,7 +236,7 @@ Custom Score が raw skill name の部分一致に強く依存しないように
 * `skillId -> normalizedKey` の変換を実装する
 * raw name fallback を用意する
 * skill category の初期分類を定義する
-* table rank 推定の最小実装を作る
+* skill quality 推定の最小実装を作る
 
 ### 推奨ファイル
 
@@ -278,23 +278,23 @@ export type NormalizedArtifactSkill = {
 };
 ```
 
-### table rank 方針
+### skill quality 方針
 
 初期実装:
 
 ```ts id="z8p28e"
-const QUALITY_TO_TABLE_RANK = {
-  1: "a",
-  2: "b",
-  3: "c",
-  4: "d",
-  5: "e",
+const QUALITY_TO_SKILL_QUALITY = {
+  1: "E",
+  2: "D",
+  3: "C",
+  4: "B",
+  5: "A",
 } as const;
 ```
 
 注意:
 
-* 第4スキルは a〜e table rank として扱わない可能性が高い
+* 第4スキルは A〜E skill quality として扱わない可能性が高い
 * slot 4 は `tableRank: undefined` または別扱いにする
 * 実データ検証後に補正する
 
@@ -382,11 +382,11 @@ export const IDEAL_MATCH_SCORE = {
 } as const;
 
 export const DEFAULT_TABLE_RANK_PENALTIES = {
-  a: 4,
-  b: 3,
+  a: 0,
+  b: 1,
   c: 2,
-  d: 1,
-  e: 0,
+  d: 3,
+  e: 4,
 } as const;
 
 ```
@@ -438,27 +438,27 @@ finalScore =
 ```text id="ealmsg"
 idealRouteScore =
   ideal match score
-  - table-rank penalties for concretely matched skills
+  - skill-quality penalties for concretely matched skills
 ```
 
 仕様:
 
 * 1/4, 2/4, 3/4, 4/4 の4段階で一致判定
 * 1～2枠は順不同、3枠と4枠は対応する枠で判定する
-* 未選択枠はワイルドカード一致とし、テーブルランク減点を適用しない
-* matched ideal skill の table rank を反映する
+* 未選択枠はワイルドカード一致とし、スキルクオリティ減点を適用しない
+* matched ideal skill の skill quality を反映する
 
 ### Priority Route
 
 ```text id="ijbsh9"
 priorityRouteScore =
-  sum of max(0, per-skill score - table-rank penalty)
+  sum of max(0, per-skill score - skill-quality penalty)
 ```
 
 仕様:
 
 * skill priority の上位ほど高い base score
-* table rank は base score から差し引く固定減点
+* skill quality は base score から差し引く固定減点
 * unwanted skill は減点
 * 1つで大きく減点
 * 複数で段階的に減点
@@ -471,8 +471,8 @@ priorityRouteScore =
 Score: 87
 Route: ideal
 + 3/4 ideal match
-+ 通常攻撃ダメージ上限 rank e
-+ 自属性攻撃力 rank d
++ 通常攻撃ダメージ上限 quality E
++ 自属性攻撃力 quality D
 ```
 
 または:
@@ -480,8 +480,8 @@ Route: ideal
 ```text id="9qphbu"
 Score: 64
 Route: priority
-+ 通常攻撃ダメージ上限 rank e
-+ 自属性攻撃力 rank d
++ 通常攻撃ダメージ上限 quality E
++ 自属性攻撃力 quality D
 - 不要スキル 1件
 ```
 
@@ -509,8 +509,8 @@ Route: priority
 * slots 1–2 unordered and slots 3–4 exact matching
 * per-skill score affects score
 * unwanted-skill metadata does not affect score
-* configurable table-rank penalty
-* desired skill rank d beats minor skill rank e
+* configurable skill-quality penalty
+* desired skill quality D beats minor skill quality E
 * final score chooses ideal route
 * final score chooses priority route
 * score reasons are generated
@@ -817,7 +817,7 @@ customScoreReasons
 * sample API response で evaluator を確認する
 * 実際の保存済み artifacts で score distribution を確認する
 * ideal match score を調整する
-* table-rank penalty を調整する
+* skill-quality penalty を調整する
 * per-skill score を調整する
 * score reasons が理解しやすいか確認する
 
@@ -827,7 +827,7 @@ customScoreReasons
 * 4/4 ideal match が明確に上位になるか
 * 不要スキル1個で過剰に落ちすぎないか
 * priority route で不要スキルが効いているか
-* desired skill d が minor skill e より高いか
+* desired skill quality D が minor skill quality E より高いか
 * game score と custom score の違いが理解しやすいか
 
 ### Validation
@@ -1037,21 +1037,21 @@ Mitigation:
 * calculate from Artifact + ScoreProfile
 * cache only with explicit versioning if needed
 
-### Risk: table-rank penalty hides low base scores
+### Risk: skill-quality penalty hides low base scores
 
 Mitigation:
 
 * floor each adjusted score at zero
-* keep table-rank penalties configurable from 0 to 25
-* validate `a >= b >= c >= d >= e`
+* keep skill-quality penalties configurable from 0 to 25
+* validate `A <= B <= C <= D <= E`
 
-### Risk: table rank overpowers skill priority
+### Risk: skill quality overpowers skill priority
 
 Mitigation:
 
-* table rank is a small fixed subtraction from skill score
-* validate `a >= b >= c >= d >= e`
-* test desired skill rank d > minor skill rank e
+* skill quality is a small fixed subtraction from skill score
+* validate `A <= B <= C <= D <= E`
+* test desired skill quality D > minor skill quality E
 
 ## Done Criteria for Custom Score Phase 1
 
@@ -1063,7 +1063,7 @@ Phase 1 is complete when:
 * evaluator calculates final score using `max(idealRouteScore, priorityRouteScore)`
 * ideal route supports 1/4〜4/4 match
 * slots 1–2 are unordered and slots 3–4 match their corresponding slots
-* table-rank penalty is applied to both routes
+* skill-quality penalty is applied to both routes
 * Lv1 baseline policy is documented and reflected
 * score result includes explanation reasons
 * Dashboard can display custom score

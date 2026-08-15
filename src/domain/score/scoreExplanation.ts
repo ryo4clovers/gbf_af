@@ -35,8 +35,8 @@ export function createAppliedTablePenaltyReason(args: {
     skillKey: args.skill.normalizedKey,
     label:
       args.skill.tableRank === undefined
-        ? `${args.skill.rawName} rank unknown`
-        : `${args.skill.rawName} rank ${args.skill.tableRank}`,
+        ? `${args.skill.rawName} quality unknown`
+        : `${args.skill.rawName} quality ${args.skill.tableRank.toUpperCase()}`,
     delta: -args.penalty,
   };
 }

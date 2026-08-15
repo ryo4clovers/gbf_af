@@ -58,11 +58,11 @@ export const DEFAULT_IDEAL_MATCH_SCORES: IdealMatchScores = {
 };
 
 export const DEFAULT_TABLE_RANK_PENALTIES: TableRankPenalties = {
-  a: 4,
-  b: 3,
+  a: 0,
+  b: 1,
   c: 2,
-  d: 1,
-  e: 0,
+  d: 3,
+  e: 4,
 };
 
 export const DEFAULT_CUSTOM_SCORE_SETTINGS: CustomScoreSettings = {
@@ -101,17 +101,16 @@ export function withCustomScoreSettingsDefaults(
     skillScores: settings.skillScores
       ? normalizeSkillScores(settings.skillScores)
       : createSkillScoresFromLegacyPriority(settings.skillPriority ?? []),
-    tableRankPenalties: {
-      ...DEFAULT_TABLE_RANK_PENALTIES,
-      ...settings.tableRankPenalties,
-    },
+    tableRankPenalties: normalizeTableRankPenalties(
+      settings.tableRankPenalties,
+    ),
     updatedAt: settings.updatedAt ?? "default",
   };
 }
 
 export function validateTableRankPenalties(penalties: unknown): string | null {
   if (typeof penalties !== "object" || penalties === null) {
-    return "Table rank penalties are required.";
+    return "Skill quality penalties are required.";
   }
 
   const ranks: TableRank[] = ["a", "b", "c", "d", "e"];
@@ -126,7 +125,7 @@ export function validateTableRankPenalties(penalties: unknown): string | null {
         value <= 25,
     )
   ) {
-    return "Table rank penalties must be integers from 0 to 25.";
+    return "Skill quality penalties must be integers from 0 to 25.";
   }
 
   for (let index = 1; index < values.length; index += 1) {
@@ -136,13 +135,35 @@ export function validateTableRankPenalties(penalties: unknown): string | null {
     if (
       typeof previousValue === "number" &&
       typeof currentValue === "number" &&
-      previousValue < currentValue
+      previousValue > currentValue
     ) {
-      return "Table rank penalties must satisfy a >= b >= c >= d >= e.";
+      return "Skill quality penalties must satisfy A <= B <= C <= D <= E.";
     }
   }
 
   return null;
+}
+
+function normalizeTableRankPenalties(
+  penalties: TableRankPenalties | undefined,
+): TableRankPenalties {
+  const merged = { ...DEFAULT_TABLE_RANK_PENALTIES, ...penalties };
+  const isLegacyDescending =
+    merged.a >= merged.b &&
+    merged.b >= merged.c &&
+    merged.c >= merged.d &&
+    merged.d >= merged.e &&
+    (merged.a > merged.e || merged.b > merged.d);
+
+  if (!isLegacyDescending) return merged;
+
+  return {
+    a: merged.e,
+    b: merged.d,
+    c: merged.c,
+    d: merged.b,
+    e: merged.a,
+  };
 }
 
 export function validateSkillScores(skillScores: unknown): string | null {

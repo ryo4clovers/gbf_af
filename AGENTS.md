@@ -147,7 +147,7 @@ User-configurable inputs:
 
 * Ideal skill configurations and match-count scores.
 * Per-skill scores for slots 1–2, slot 3, and slot 4.
-* Shared table-rank penalties.
+* Shared skill-quality penalties.
 
 The evaluator should calculate two positive routes and use the higher one.
 
@@ -166,14 +166,14 @@ Evaluates how close the artifact is to the user's ideal skill composition.
 ```text
 idealRouteScore =
   ideal match score
-  - table-rank penalties for concretely matched skills
+  - skill-quality penalties for concretely matched skills
 ```
 
 Rules:
 
 * Match count is evaluated as 1/4, 2/4, 3/4, or 4/4.
 * Slots 1–2 are matched as an unordered pair; slots 3 and 4 match their corresponding slots.
-* Unselected slots are wildcard matches and receive no table-rank penalty.
+* Unselected slots are wildcard matches and receive no skill-quality penalty.
 * The route score is floored at zero.
 
 ### priorityRouteScore
@@ -182,31 +182,31 @@ Evaluates general skill value.
 
 ```text
 priorityRouteScore =
-  sum of max(0, per-skill score - table-rank penalty)
+  sum of max(0, per-skill score - skill-quality penalty)
 ```
 
 Rules:
 
 * Every available skill receives an integer score from 0 to 25 in its slot group.
 * Unwanted-skill metadata does not affect scoring.
-* Slot 4 and unknown table ranks receive no table-rank penalty.
+* Slot 4 and unknown skill qualities receive no skill-quality penalty.
 
 ### Effect Table Handling
 
-Many skills have an effect table rank from `a` to `e` at the same skill level.
+Many skills have a skill quality from `A` to `E` at the same skill level. `A` is the highest quality.
 
 Rules:
 
-* Rank `a` receives the largest penalty and rank `e` the smallest.
-* A desired skill with rank `d` should score higher than a low-value skill with rank `e`.
-* Users configure integer penalties from 0 to 25 while preserving `a >= b >= c >= d >= e`.
-* The default penalties are `4 / 3 / 2 / 1 / 0`.
+* Quality `A` receives the smallest penalty and quality `E` the largest.
+* A desired skill with quality `D` should score higher than a low-value skill with quality `E`.
+* Users configure integer penalties from 0 to 25 while preserving `A <= B <= C <= D <= E`.
+* The default penalties are `0 / 1 / 2 / 3 / 4`.
 
 Example:
 
 ```text
-important skill d: max(0, 25 - 1) = 24
-minor skill e:     max(0, 10 - 0) = 10
+important skill D: max(0, 25 - 3) = 22
+minor skill E:     max(0, 10 - 4) = 6
 ```
 
 ### Skill Level Handling
@@ -294,8 +294,8 @@ Example explanation:
 ```text
 Score: 87
 + 3/4 ideal match
-+ 通常攻撃ダメージ上限 rank e
-+ 自属性攻撃力 rank d
++ 通常攻撃ダメージ上限 quality E
++ 自属性攻撃力 quality D
 - 不要スキル 1件
 ```
 

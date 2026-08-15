@@ -23,6 +23,7 @@ export type ExtensionMessage =
   | GetStoredArtifactCountMessage
   | GetStoredArtifactsMessage
   | ClearStoredArtifactsMessage
+  | ImportArtifactDataMessage
   | GetArtifactUserReviewsMessage
   | SaveArtifactUserReviewMessage
   | ClearArtifactUserReviewsMessage
@@ -46,6 +47,7 @@ export type ExtensionResponse =
   | StoredArtifactCountResponse
   | StoredArtifactsResponse
   | ClearStoredArtifactsResponse
+  | ImportArtifactDataResponse
   | ArtifactUserReviewsResponse
   | SaveArtifactUserReviewResponse
   | ClearArtifactUserReviewsResponse
@@ -118,6 +120,13 @@ export type GetStoredArtifactsMessage = {
 
 export type ClearStoredArtifactsMessage = {
   type: "CLEAR_STORED_ARTIFACTS";
+};
+
+export type ImportArtifactDataMessage = {
+  type: "IMPORT_ARTIFACT_DATA";
+  artifacts: Artifact[];
+  reviews: ArtifactUserReview[];
+  presence: ArtifactPresence[];
 };
 
 export type GetArtifactUserReviewsMessage = {
@@ -239,6 +248,12 @@ export type ClearStoredArtifactsResponse = {
   type: "CLEAR_STORED_ARTIFACTS_RESULT";
   artifactCount: number;
   scan: ScanState;
+};
+
+export type ImportArtifactDataResponse = {
+  ok: true;
+  type: "IMPORT_ARTIFACT_DATA_RESULT";
+  artifactCount: number;
 };
 
 export type ArtifactUserReviewsResponse = {

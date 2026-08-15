@@ -547,7 +547,7 @@ Evaluates closeness to ideal skill composition.
 ```text
 idealRouteScore =
   ideal match score
-  - table-rank penalties for concretely matched skills
+  - skill-quality penalties for concretely matched skills
 ```
 
 Rules:
@@ -563,7 +563,7 @@ Evaluates general skill value.
 
 ```text
 priorityRouteScore =
-  sum of max(0, per-skill score - table-rank penalty)
+  sum of max(0, per-skill score - skill-quality penalty)
 ```
 
 Rules:
@@ -572,9 +572,9 @@ Rules:
 * the four base skill scores sum to at most 100
 * unwanted-skill metadata does not affect scoring
 
-### Effect Table Rank
+### Skill Quality
 
-Table rank is a configurable fixed penalty on skill base score.
+Skill quality is a configurable fixed penalty on skill base score. `A` is the highest quality and receives the smallest penalty.
 
 Reason:
 

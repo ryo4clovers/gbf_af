@@ -362,7 +362,7 @@ finalScore =
 ```text
 idealRouteScore =
   ideal match score
-  - table-rank penalties for concretely matched skills
+  - skill-quality penalties for concretely matched skills
 ```
 
 要件:
@@ -370,7 +370,7 @@ idealRouteScore =
 * 1/4, 2/4, 3/4, 4/4 の4段階で一致判定する
 * 1～2枠は順不同、3枠と4枠は対応する枠で判定する
 * 未選択枠は一致として扱う
-* 理想構成で具体的に一致したスキルのテーブルランク減点を差し引く
+* 理想構成で具体的に一致したスキルのスキルクオリティ減点を差し引く
 
 #### priorityRouteScore
 
@@ -378,7 +378,7 @@ idealRouteScore =
 
 ```text
 priorityRouteScore =
-  sum of max(0, per-skill score - table-rank penalty)
+  sum of max(0, per-skill score - skill-quality penalty)
 ```
 
 要件:
@@ -391,9 +391,9 @@ priorityRouteScore =
 
 要件:
 
-* a〜e の effect table rank を扱えること
-* `a` の減点を最も大きく、`e` の減点を最も小さくする
-* 減点幅は0～25で設定し、`a >= b >= c >= d >= e`を維持する
+* A〜E のスキルクオリティを扱い、Aを最高品質、Eを最低品質とすること
+* `A` の減点を最も小さく、`E` の減点を最も大きくする
+* 減点幅は0～25で設定し、`A <= B <= C <= D <= E`を維持する
 * 減算後のスコアは0未満にしない
 * 「欲しいスキルの d」が「微妙なスキルの e」より高くなるようにする
 
@@ -423,8 +423,8 @@ custom score の結果は、ユーザーが理由を確認できること。
 Score: 87
 Route: ideal
 + 3/4 ideal match
-+ 通常攻撃ダメージ上限 rank e
-+ 自属性攻撃力 rank d
++ 通常攻撃ダメージ上限 quality E
++ 自属性攻撃力 quality D
 ```
 
 または:
@@ -432,8 +432,8 @@ Route: ideal
 ```text
 Score: 64
 Route: priority
-+ 通常攻撃ダメージ上限 rank e
-+ 自属性攻撃力 rank d
++ 通常攻撃ダメージ上限 quality E
++ 自属性攻撃力 quality D
 ```
 
 ## 非機能要件

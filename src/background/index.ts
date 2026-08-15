@@ -1,6 +1,7 @@
 import { ZodError } from "zod";
 import { artifactListResponseSchema } from "../api/artifactListSchema";
 import type { ArtifactListResponse } from "../api/artifactListTypes";
+import { isImportedArtifactData } from "../csv/artifactCsv";
 import type { Artifact } from "../domain/artifact";
 import type { ArtifactUserReview } from "../domain/artifactUserReview";
 import {
@@ -42,6 +43,7 @@ import {
   getLatestScanSession,
   getScanMetadata,
   getUnwantedSkillConfig,
+  importArtifactData,
   markMissingArtifactsPossiblyDeleted,
   saveArtifactUserReview,
   saveCustomScoreSettings,
@@ -142,13 +144,15 @@ async function handleMessage(
         display: currentDisplayState,
       };
     case "ARTIFACT_LIST_OBSERVED":
-      return handleObservedArtifactList(message);
+      return runModeOperation(() => handleObservedArtifactList(message));
     case "GET_STORED_ARTIFACT_COUNT":
       return getStoredArtifactCountResponse();
     case "GET_STORED_ARTIFACTS":
       return getStoredArtifactsResponse();
     case "CLEAR_STORED_ARTIFACTS":
-      return clearStoredArtifacts();
+      return runModeOperation(clearStoredArtifacts);
+    case "IMPORT_ARTIFACT_DATA":
+      return runModeOperation(() => importArtifactDataResponse(message));
     case "GET_ARTIFACT_USER_REVIEWS":
       return getArtifactUserReviewsResponse();
     case "SAVE_ARTIFACT_USER_REVIEW":
@@ -826,6 +830,15 @@ async function getStoredArtifactsResponse(): Promise<ExtensionResponse> {
 }
 
 async function clearStoredArtifacts(): Promise<ExtensionResponse> {
+  if (
+    currentScanState.activeScanSessionId !== null ||
+    (await getActiveScanSession()) !== null
+  ) {
+    return scanErrorResponse(
+      "request_failed",
+      "Stop artifact observation before clearing stored data.",
+    );
+  }
   try {
     await clearAllArtifacts();
     clearArtifactsInMemory();
@@ -846,6 +859,45 @@ async function clearStoredArtifacts(): Promise<ExtensionResponse> {
       "storage_failed",
       "Could not clear stored artifact data.",
     );
+  }
+}
+
+async function importArtifactDataResponse(
+  message: Extract<ExtensionMessage, { type: "IMPORT_ARTIFACT_DATA" }>,
+): Promise<ExtensionResponse> {
+  if (
+    currentScanState.activeScanSessionId !== null ||
+    (await getActiveScanSession()) !== null
+  ) {
+    return scanErrorResponse(
+      "request_failed",
+      "Stop artifact observation before importing artifact data.",
+    );
+  }
+  if (!isImportedArtifactData(message)) {
+    return {
+      ok: false,
+      type: "ERROR",
+      message: "Imported artifact data is invalid.",
+      errorCode: "api_validation_failed",
+    };
+  }
+  try {
+    await importArtifactData(message);
+    currentScanState = await hydratePersistedScanState(currentScanState);
+    return {
+      ok: true,
+      type: "IMPORT_ARTIFACT_DATA_RESULT",
+      artifactCount: message.artifacts.length,
+    };
+  } catch (error) {
+    logDebugError("Could not import artifact data", error);
+    return {
+      ok: false,
+      type: "ERROR",
+      message: "Could not import artifact data.",
+      errorCode: "storage_failed",
+    };
   }
 }
 
