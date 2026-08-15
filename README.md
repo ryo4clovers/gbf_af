@@ -23,7 +23,7 @@ Granblue Fantasy のアーティファクト(AF)管理を目的とした Chrome 
 - 観測したレスポンスを content bridge 経由で background service worker に渡す
 - 正規化したアーティファクト情報を IndexedDB に保存する
 - ローカルデータを Side Panel / Dashboard で表示、検索、並び替え、CSV出力する
-- ユーザが付与した rating / memo / 将来の custom score profile をローカル保存する
+- ユーザが付与した rating / memo / custom score settings をローカル保存する
 
 ## 現在の構成
 
@@ -284,7 +284,7 @@ minor skill e:     10 * 1.25 = 12.5
 
 #### Phase 1
 
-* rule/profile based scoring
+* rule-based scoring
 * ideal skill set
 * skill priority
 * unwanted skills
@@ -293,18 +293,8 @@ minor skill e:     10 * 1.25 = 12.5
 
 #### Phase 2
 
-* preset score profiles
-
-  * normal attack
-  * ougi
-  * ability damage
-  * defense
-  * general use
-
-#### Phase 3
-
 * advanced/custom formula editor
-* import/export score profiles
+* import/export score settings
 * more detailed skill categorization
 
 ## Custom Score 実装方針
@@ -313,10 +303,9 @@ Custom score は、Artifact本体へ永続的に焼き込まない方針を優�
 
 理由:
 
-* score profile は後から変わる
+* score settings は後から変わる
 * スコア算出ロジックも調整される
 * artifact data と user scoring policy を分離した方が保守しやすい
-* 複数 profile による比較がしやすい
 
 推奨される責務分離:
 
@@ -324,7 +313,7 @@ Custom score は、Artifact本体へ永続的に焼き込まない方針を優�
 Artifact
 -> observed normalized data
 
-ScoreProfile
+CustomScoreSettings
 -> user-defined scoring policy
 
 ScoreEvaluator

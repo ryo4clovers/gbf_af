@@ -222,7 +222,7 @@ Responsibilities:
 * filter lifecycle status
 * export CSV
 * eventually show custom score and score reasons
-* eventually edit score profiles
+* edit the single custom score settings record
 
 Dashboard must operate on local data only.
 
@@ -378,7 +378,7 @@ artifactPresence
 Future stores may include:
 
 ```text
-scoreProfiles
+scoreSettings
 scoreSettings
 ```
 
@@ -444,7 +444,7 @@ Keep the following concepts separate:
 * artifact presence / lifecycle
 * user review metadata
 * display state
-* custom score profile / scoring policy
+* custom score settings / scoring policy
 * calculated score result
 * statistics result
 
@@ -524,13 +524,13 @@ Display state should not be treated as persisted artifact data.
 Future custom score models should be separated into:
 
 ```text
-ScoreProfile
+CustomScoreSettings
 ScoreEvaluator
 ScoreResult
 ScoreReason
 ```
 
-`ScoreProfile` represents user-defined policy.
+`CustomScoreSettings` represents the single user-defined scoring policy.
 `ScoreEvaluator` is pure calculation logic.
 `ScoreResult` is calculated output for UI.
 `ScoreReason` explains why a score was produced.
@@ -740,7 +740,7 @@ Future score-related layout:
 
 ```text
 src/domain/score/
-  scoreProfile.ts
+  customScoreSettings.ts
   scoreResult.ts
   scoreConstants.ts
   evaluateCustomScore.ts

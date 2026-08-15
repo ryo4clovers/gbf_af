@@ -1,12 +1,14 @@
 import type { NormalizedArtifactSkill } from "../skill/normalizedSkill";
-import { IDEAL_MATCH_SCORE } from "./scoreConstants";
+import {
+  type CustomScoreSettings,
+  DEFAULT_IDEAL_MATCH_SCORES,
+} from "./customScoreSettings";
 import {
   createAppliedTableMultiplierReason,
   createIdealMatchReason,
   getTableRankMultiplier,
   roundScore,
 } from "./scoreExplanation";
-import type { ScoreProfile } from "./scoreProfile";
 import type { ScoreReason } from "./scoreResult";
 
 export type IdealRouteResult = {
@@ -16,15 +18,15 @@ export type IdealRouteResult = {
 
 export function evaluateIdealRoute(args: {
   skills: NormalizedArtifactSkill[];
-  profile: ScoreProfile;
+  settings: CustomScoreSettings;
 }): IdealRouteResult {
-  const idealSkillKeys = getUniqueSkillKeys(args.profile.idealSkillKeys).slice(
+  const idealSkillKeys = getUniqueSkillKeys(args.settings.idealSkillKeys).slice(
     0,
     4,
   );
   const matchedSkills = getUniqueMatchedSkills(args.skills, idealSkillKeys);
   const matchCount = Math.min(matchedSkills.length, 4) as 0 | 1 | 2 | 3 | 4;
-  const matchScore = IDEAL_MATCH_SCORE[matchCount];
+  const matchScore = getIdealMatchScore(args.settings, matchCount);
   const reasons: ScoreReason[] = [
     createIdealMatchReason({
       matchCount,
@@ -52,6 +54,20 @@ export function evaluateIdealRoute(args: {
     score: roundScore(matchScore + tableMultiplierScore),
     reasons,
   };
+}
+
+function getIdealMatchScore(
+  settings: CustomScoreSettings,
+  matchCount: 0 | 1 | 2 | 3 | 4,
+): number {
+  if (matchCount === 0) {
+    return 0;
+  }
+
+  return (
+    settings.idealMatchScores?.[matchCount] ??
+    DEFAULT_IDEAL_MATCH_SCORES[matchCount]
+  );
 }
 
 function getUniqueMatchedSkills(

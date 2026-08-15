@@ -173,7 +173,7 @@ Artifact 本体、lifecycle、user review metadata、display state、custom scor
 * `ArtifactUserReview`
 * `DisplayState`
 * `GameScore`
-* future `ScoreProfile`
+* `CustomScoreSettings`
 * future `ScoreResult`
 
 現在の user review metadata:

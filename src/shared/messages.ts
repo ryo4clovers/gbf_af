@@ -3,9 +3,9 @@ import type { ArtifactUserReview } from "../domain/artifactUserReview";
 import type { DisplayState } from "../domain/displayMode";
 import type { ArtifactPresence, ScanSession } from "../domain/scanSession";
 import type {
-  ScoreProfile,
+  CustomScoreSettings,
   UnwantedSkillConfig,
-} from "../domain/score/scoreProfile";
+} from "../domain/score/customScoreSettings";
 import type { AppMode, ScanErrorCode, ScanState } from "../state/appState";
 
 export type ExtensionMessage =
@@ -28,14 +28,10 @@ export type ExtensionMessage =
   | ClearArtifactUserReviewsMessage
   | GetScanSessionsMessage
   | GetArtifactPresenceMessage
-  | GetScoreProfilesMessage
-  | GetScoreProfileMessage
-  | SaveScoreProfileMessage
-  | DeleteScoreProfileMessage
+  | GetCustomScoreSettingsMessage
+  | SaveCustomScoreSettingsMessage
   | GetUnwantedSkillConfigMessage
   | SaveUnwantedSkillConfigMessage
-  | GetSelectedScoreProfileIdMessage
-  | SaveSelectedScoreProfileIdMessage
   | OpenDashboardMessage
   | GetPageInfoMessage;
 
@@ -55,14 +51,10 @@ export type ExtensionResponse =
   | ClearArtifactUserReviewsResponse
   | ScanSessionsResponse
   | ArtifactPresenceResponse
-  | ScoreProfilesResponse
-  | ScoreProfileResponse
-  | SaveScoreProfileResponse
-  | DeleteScoreProfileResponse
+  | CustomScoreSettingsResponse
+  | SaveCustomScoreSettingsResponse
   | UnwantedSkillConfigResponse
   | SaveUnwantedSkillConfigResponse
-  | SelectedScoreProfileIdResponse
-  | SaveSelectedScoreProfileIdResponse
   | OpenDashboardResponse
   | ErrorResponse;
 
@@ -149,23 +141,13 @@ export type GetArtifactPresenceMessage = {
   type: "GET_ARTIFACT_PRESENCE";
 };
 
-export type GetScoreProfilesMessage = {
-  type: "GET_SCORE_PROFILES";
+export type GetCustomScoreSettingsMessage = {
+  type: "GET_CUSTOM_SCORE_SETTINGS";
 };
 
-export type GetScoreProfileMessage = {
-  type: "GET_SCORE_PROFILE";
-  profileId: string;
-};
-
-export type SaveScoreProfileMessage = {
-  type: "SAVE_SCORE_PROFILE";
-  profile: ScoreProfile;
-};
-
-export type DeleteScoreProfileMessage = {
-  type: "DELETE_SCORE_PROFILE";
-  profileId: string;
+export type SaveCustomScoreSettingsMessage = {
+  type: "SAVE_CUSTOM_SCORE_SETTINGS";
+  settings: CustomScoreSettings;
 };
 
 export type GetUnwantedSkillConfigMessage = {
@@ -175,15 +157,6 @@ export type GetUnwantedSkillConfigMessage = {
 export type SaveUnwantedSkillConfigMessage = {
   type: "SAVE_UNWANTED_SKILL_CONFIG";
   config: UnwantedSkillConfig;
-};
-
-export type GetSelectedScoreProfileIdMessage = {
-  type: "GET_SELECTED_SCORE_PROFILE_ID";
-};
-
-export type SaveSelectedScoreProfileIdMessage = {
-  type: "SAVE_SELECTED_SCORE_PROFILE_ID";
-  profileId: string | null;
 };
 
 export type OpenDashboardMessage = {
@@ -299,28 +272,16 @@ export type ArtifactPresenceResponse = {
   presence: Record<number, ArtifactPresence>;
 };
 
-export type ScoreProfilesResponse = {
+export type CustomScoreSettingsResponse = {
   ok: true;
-  type: "SCORE_PROFILES";
-  profiles: ScoreProfile[];
+  type: "CUSTOM_SCORE_SETTINGS";
+  settings: CustomScoreSettings;
 };
 
-export type ScoreProfileResponse = {
+export type SaveCustomScoreSettingsResponse = {
   ok: true;
-  type: "SCORE_PROFILE";
-  profile: ScoreProfile | null;
-};
-
-export type SaveScoreProfileResponse = {
-  ok: true;
-  type: "SAVE_SCORE_PROFILE_RESULT";
-  profile: ScoreProfile;
-};
-
-export type DeleteScoreProfileResponse = {
-  ok: true;
-  type: "DELETE_SCORE_PROFILE_RESULT";
-  profileId: string;
+  type: "SAVE_CUSTOM_SCORE_SETTINGS_RESULT";
+  settings: CustomScoreSettings;
 };
 
 export type UnwantedSkillConfigResponse = {
@@ -333,18 +294,6 @@ export type SaveUnwantedSkillConfigResponse = {
   ok: true;
   type: "SAVE_UNWANTED_SKILL_CONFIG_RESULT";
   config: UnwantedSkillConfig;
-};
-
-export type SelectedScoreProfileIdResponse = {
-  ok: true;
-  type: "SELECTED_SCORE_PROFILE_ID";
-  profileId: string | null;
-};
-
-export type SaveSelectedScoreProfileIdResponse = {
-  ok: true;
-  type: "SAVE_SELECTED_SCORE_PROFILE_ID_RESULT";
-  profileId: string | null;
 };
 
 export type OpenDashboardResponse = {

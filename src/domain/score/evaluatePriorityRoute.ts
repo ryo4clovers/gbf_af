@@ -1,4 +1,8 @@
 import type { NormalizedArtifactSkill } from "../skill/normalizedSkill";
+import type {
+  CustomScoreSettings,
+  UnwantedSkillConfig,
+} from "./customScoreSettings";
 import {
   PRIORITY_BASE_SCORE,
   PRIORITY_BASE_SCORE_FALLBACK,
@@ -11,7 +15,6 @@ import {
   getTableRankMultiplier,
   roundScore,
 } from "./scoreExplanation";
-import type { ScoreProfile, UnwantedSkillConfig } from "./scoreProfile";
 import type { ScoreReason } from "./scoreResult";
 
 export type PriorityRouteResult = {
@@ -21,11 +24,11 @@ export type PriorityRouteResult = {
 
 export function evaluatePriorityRoute(args: {
   skills: NormalizedArtifactSkill[];
-  profile: ScoreProfile;
+  settings: CustomScoreSettings;
   unwantedSkillConfig: UnwantedSkillConfig;
 }): PriorityRouteResult {
   const priorityRankBySkillKey = createPriorityRankMap(
-    args.profile.skillPriority,
+    args.settings.skillPriority,
   );
   const reasons: ScoreReason[] = [];
   let score = 0;
@@ -80,7 +83,7 @@ export function evaluatePriorityRoute(args: {
 }
 
 function createPriorityRankMap(
-  entries: ScoreProfile["skillPriority"],
+  entries: CustomScoreSettings["skillPriority"],
 ): Map<string, number> {
   const priorityRankBySkillKey = new Map<string, number>();
 

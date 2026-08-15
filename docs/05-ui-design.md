@@ -602,7 +602,7 @@ Phase 1 では自由数式エディタを作らない。
 
 ```text
 Custom Score Panel
-├─ Score Profile Selector
+├─ Score Settings
 ├─ Ideal Skill Composition Editor
 ├─ Skill Priority Editor
 ├─ Unwanted Skill Editor
@@ -610,7 +610,7 @@ Custom Score Panel
 └─ Score Explanation
 ```
 
-### Score Profile Selector
+### Score Settings
 
 表示:
 
@@ -773,7 +773,7 @@ Custom Score 実装後、Dashboard に以下を追加する。
 
 ### Header / Controls
 
-* selected score profile
+* custom score settings
 * recalculate scores action if needed
 * score settings button
 
@@ -832,12 +832,12 @@ No artifact page observed yet.
 Start display mode and open an artifact page in GBF.
 ```
 
-### No Score Profile
+### Score Settings Load Error
 
 表示例:
 
 ```text
-No score profile yet.
+Custom score settings could not be loaded.
 Create a profile by selecting ideal skills, skill priority, and unwanted skills.
 ```
 
@@ -971,7 +971,7 @@ src/dashboard/
 
 ```text
 src/dashboard/score/
-  ScoreProfileSelector.tsx
+  ScoreSettingsEditor.tsx
   IdealSkillCompositionEditor.tsx
   SkillPriorityEditor.tsx
   UnwantedSkillEditor.tsx

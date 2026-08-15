@@ -2,11 +2,13 @@ import type { Artifact } from "../domain/artifact";
 import type { ArtifactUserReview } from "../domain/artifactUserReview";
 import type { ArtifactPresence, ScanSession } from "../domain/scanSession";
 import {
-  DEFAULT_SCORE_PROFILE,
+  type CustomScoreSettings,
+  DEFAULT_CUSTOM_SCORE_SETTINGS,
+  DEFAULT_IDEAL_MATCH_SCORES,
   DEFAULT_UNWANTED_SKILL_CONFIG,
-  type ScoreProfile,
   type UnwantedSkillConfig,
-} from "../domain/score/scoreProfile";
+  withCustomScoreSettingsDefaults,
+} from "../domain/score/customScoreSettings";
 
 const DATABASE_NAME = "gbf-artifact-manager";
 const DATABASE_VERSION = 4;
@@ -15,11 +17,12 @@ const SCAN_METADATA_STORE_NAME = "scanMetadata";
 const ARTIFACT_USER_REVIEW_STORE_NAME = "artifactUserReviews";
 const SCAN_SESSION_STORE_NAME = "scanSessions";
 const ARTIFACT_PRESENCE_STORE_NAME = "artifactPresence";
-const SCORE_PROFILE_STORE_NAME = "scoreProfiles";
+const LEGACY_SCORE_PROFILE_STORE_NAME = "scoreProfiles";
 const SCORE_SETTING_STORE_NAME = "scoreSettings";
 const LAST_SCAN_METADATA_ID = "lastScan";
+const CUSTOM_SCORE_SETTINGS_ID = "customScoreSettings";
 const UNWANTED_SKILL_CONFIG_ID = "unwantedSkillConfig";
-const SELECTED_SCORE_PROFILE_ID = "selectedScoreProfile";
+const LEGACY_SELECTED_SCORE_PROFILE_ID = "selectedScoreProfile";
 
 export type ScanMetadata = {
   id: typeof LAST_SCAN_METADATA_ID;
@@ -49,9 +52,22 @@ type UnwantedSkillConfigRecord = {
   config: UnwantedSkillConfig;
 };
 
-type SelectedScoreProfileRecord = {
-  id: typeof SELECTED_SCORE_PROFILE_ID;
+type CustomScoreSettingsRecord = {
+  id: typeof CUSTOM_SCORE_SETTINGS_ID;
+  settings: CustomScoreSettings;
+};
+
+type LegacySelectedScoreProfileRecord = {
+  id: typeof LEGACY_SELECTED_SCORE_PROFILE_ID;
   profileId: string | null;
+};
+
+type LegacyScoreProfile = {
+  id: string;
+  idealSkillKeys: CustomScoreSettings["idealSkillKeys"];
+  idealMatchScores?: CustomScoreSettings["idealMatchScores"];
+  skillPriority: CustomScoreSettings["skillPriority"];
+  updatedAt: string;
 };
 
 export async function saveScannedArtifacts(
@@ -354,70 +370,50 @@ export async function markMissingArtifactsPossiblyDeleted(
   };
 }
 
-export async function getScoreProfiles(): Promise<ScoreProfile[]> {
+export async function getCustomScoreSettings(): Promise<CustomScoreSettings> {
   const database = await openDatabase();
   const request = database
-    .transaction(SCORE_PROFILE_STORE_NAME, "readonly")
-    .objectStore(SCORE_PROFILE_STORE_NAME)
-    .getAll();
-  const profiles = await waitForRequest<ScoreProfile[]>(request);
+    .transaction(SCORE_SETTING_STORE_NAME, "readonly")
+    .objectStore(SCORE_SETTING_STORE_NAME)
+    .get(CUSTOM_SCORE_SETTINGS_ID);
+  const record = await waitForRequest<CustomScoreSettingsRecord | undefined>(
+    request,
+  );
 
-  database.close();
-  return profiles.length > 0 ? profiles : [DEFAULT_SCORE_PROFILE];
-}
-
-export async function getScoreProfile(
-  profileId: string,
-): Promise<ScoreProfile | null> {
-  if (profileId === DEFAULT_SCORE_PROFILE.id) {
-    return DEFAULT_SCORE_PROFILE;
+  if (record !== undefined) {
+    database.close();
+    return withCustomScoreSettingsDefaults(record.settings);
   }
 
-  const database = await openDatabase();
-  const request = database
-    .transaction(SCORE_PROFILE_STORE_NAME, "readonly")
-    .objectStore(SCORE_PROFILE_STORE_NAME)
-    .get(profileId);
-  const profile = await waitForRequest<ScoreProfile | undefined>(request);
-
-  database.close();
-  return profile ?? null;
-}
-
-export async function saveScoreProfile(profile: ScoreProfile): Promise<void> {
-  const database = await openDatabase();
+  const settings = await getLegacyCustomScoreSettings(database);
   const transaction = database.transaction(
-    SCORE_PROFILE_STORE_NAME,
+    SCORE_SETTING_STORE_NAME,
     "readwrite",
   );
 
-  transaction.objectStore(SCORE_PROFILE_STORE_NAME).put(profile);
+  transaction.objectStore(SCORE_SETTING_STORE_NAME).put({
+    id: CUSTOM_SCORE_SETTINGS_ID,
+    settings,
+  } satisfies CustomScoreSettingsRecord);
 
   await waitForTransaction(transaction);
   database.close();
+  return settings;
 }
 
-export async function deleteScoreProfile(profileId: string): Promise<void> {
-  if (profileId === DEFAULT_SCORE_PROFILE.id) {
-    return;
-  }
-
-  const selectedProfileId = await getSelectedScoreProfileId();
+export async function saveCustomScoreSettings(
+  settings: CustomScoreSettings,
+): Promise<void> {
   const database = await openDatabase();
   const transaction = database.transaction(
-    [SCORE_PROFILE_STORE_NAME, SCORE_SETTING_STORE_NAME],
+    SCORE_SETTING_STORE_NAME,
     "readwrite",
   );
-  const settingStore = transaction.objectStore(SCORE_SETTING_STORE_NAME);
 
-  transaction.objectStore(SCORE_PROFILE_STORE_NAME).delete(profileId);
-
-  if (selectedProfileId === profileId) {
-    settingStore.put({
-      id: SELECTED_SCORE_PROFILE_ID,
-      profileId: null,
-    } satisfies SelectedScoreProfileRecord);
-  }
+  transaction.objectStore(SCORE_SETTING_STORE_NAME).put({
+    id: CUSTOM_SCORE_SETTINGS_ID,
+    settings,
+  } satisfies CustomScoreSettingsRecord);
 
   await waitForTransaction(transaction);
   database.close();
@@ -455,46 +451,43 @@ export async function saveUnwantedSkillConfig(
   database.close();
 }
 
-export async function getSelectedScoreProfileId(): Promise<string | null> {
-  const database = await openDatabase();
-  const request = database
-    .transaction(SCORE_SETTING_STORE_NAME, "readonly")
-    .objectStore(SCORE_SETTING_STORE_NAME)
-    .get(SELECTED_SCORE_PROFILE_ID);
-  const record = await waitForRequest<SelectedScoreProfileRecord | undefined>(
-    request,
-  );
-
-  database.close();
-
-  const profiles = await getScoreProfiles();
-
-  if (
-    record?.profileId !== undefined &&
-    profiles.some((profile) => profile.id === record.profileId)
-  ) {
-    return record.profileId;
+async function getLegacyCustomScoreSettings(
+  database: IDBDatabase,
+): Promise<CustomScoreSettings> {
+  if (!database.objectStoreNames.contains(LEGACY_SCORE_PROFILE_STORE_NAME)) {
+    return DEFAULT_CUSTOM_SCORE_SETTINGS;
   }
 
-  return profiles[0]?.id ?? null;
-}
+  const selectedProfileRequest = database
+    .transaction(SCORE_SETTING_STORE_NAME, "readonly")
+    .objectStore(SCORE_SETTING_STORE_NAME)
+    .get(LEGACY_SELECTED_SCORE_PROFILE_ID);
+  const selectedProfileRecord = await waitForRequest<
+    LegacySelectedScoreProfileRecord | undefined
+  >(selectedProfileRequest);
+  const profilesRequest = database
+    .transaction(LEGACY_SCORE_PROFILE_STORE_NAME, "readonly")
+    .objectStore(LEGACY_SCORE_PROFILE_STORE_NAME)
+    .getAll();
+  const profiles = await waitForRequest<LegacyScoreProfile[]>(profilesRequest);
+  const selectedProfile =
+    profiles.find(
+      (profile) => profile.id === selectedProfileRecord?.profileId,
+    ) ?? profiles[0];
 
-export async function saveSelectedScoreProfileId(
-  profileId: string | null,
-): Promise<void> {
-  const database = await openDatabase();
-  const transaction = database.transaction(
-    SCORE_SETTING_STORE_NAME,
-    "readwrite",
-  );
+  if (selectedProfile === undefined) {
+    return DEFAULT_CUSTOM_SCORE_SETTINGS;
+  }
 
-  transaction.objectStore(SCORE_SETTING_STORE_NAME).put({
-    id: SELECTED_SCORE_PROFILE_ID,
-    profileId,
-  } satisfies SelectedScoreProfileRecord);
-
-  await waitForTransaction(transaction);
-  database.close();
+  return {
+    idealSkillKeys: [...selectedProfile.idealSkillKeys],
+    idealMatchScores: {
+      ...DEFAULT_IDEAL_MATCH_SCORES,
+      ...selectedProfile.idealMatchScores,
+    },
+    skillPriority: selectedProfile.skillPriority.map((entry) => ({ ...entry })),
+    updatedAt: selectedProfile.updatedAt,
+  };
 }
 
 async function getAllScanSessions(): Promise<ScanSession[]> {
@@ -561,12 +554,6 @@ function openDatabase(): Promise<IDBDatabase> {
       if (!database.objectStoreNames.contains(ARTIFACT_PRESENCE_STORE_NAME)) {
         database.createObjectStore(ARTIFACT_PRESENCE_STORE_NAME, {
           keyPath: "ownedId",
-        });
-      }
-
-      if (!database.objectStoreNames.contains(SCORE_PROFILE_STORE_NAME)) {
-        database.createObjectStore(SCORE_PROFILE_STORE_NAME, {
-          keyPath: "id",
         });
       }
 

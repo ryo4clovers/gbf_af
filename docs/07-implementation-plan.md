@@ -1,5 +1,7 @@
 # Implementation Plan
 
+> Note: The score profile phases in this historical plan are superseded by the single `CustomScoreSettings` implementation. The application no longer exposes profile creation, selection, or deletion.
+
 ## 目的
 
 このドキュメントは、GBF Artifact Tool の現在の実装状況を前提に、次に実装する Custom Score System までの作業計画を整理する。

@@ -132,27 +132,27 @@ Reason:
 * Skill levels can be reset.
 * Current skill level should not be mixed with long-term artifact value.
 
-## Recommended Initial Constants
+## Recommended Initial Settings
 
-These values are initial candidates and may be tuned after real use.
+Ideal match scores are stored in the single custom score settings record and can be tuned by the user.
 
 ### Ideal Match Score
 
 ```ts
-const IDEAL_MATCH_SCORE = {
-  0: 0,
-  1: 20,
-  2: 45,
+const DEFAULT_IDEAL_MATCH_SCORES = {
+  1: 0,
+  2: 0,
   3: 75,
-  4: 110,
+  4: 100,
 } as const;
 ```
 
 Reasoning:
 
 * 3/4 match should be highly valuable.
-* 4/4 match should be clearly exceptional.
-* 1/4 should not dominate a generally strong artifact.
+* 4/4 match should receive the maximum base score.
+* 1/4 and 2/4 matches should not receive a base score.
+* Table rank multipliers are applied after the configurable base score and may produce a final route score above 100.
 
 ### Table Multipliers
 
@@ -191,11 +191,11 @@ Reasoning:
 ## Conceptual Types
 
 ```ts
-type ScoreProfile = {
-  id: string;
-  name: string;
+type CustomScoreSettings = {
   idealSkillKeys: string[];
+  idealMatchScores: IdealMatchScores;
   skillPriority: SkillPriorityEntry[];
+  updatedAt: string;
 };
 
 type SkillPriorityEntry = {
@@ -233,7 +233,7 @@ Recommended modules:
 
 ```text
 src/domain/score/
-  scoreProfile.ts
+  customScoreSettings.ts
   scoreResult.ts
   scoreConstants.ts
   evaluateCustomScore.ts
@@ -277,7 +277,7 @@ Do not store calculated score directly in `Artifact` as the primary source of tr
 
 Store:
 
-* Score profiles
+* Custom score settings
 * Unwanted skill config
 * Optional evaluator version
 
@@ -289,7 +289,7 @@ Calculate:
 
 If caching is later introduced, cache invalidation must consider:
 
-* Profile changes
+* Score setting changes
 * Evaluator version changes
 * Skill normalization changes
 * Artifact data changes
@@ -300,12 +300,11 @@ Phase 1 UI should avoid formula editing.
 
 Recommended UI sections:
 
-1. Score profile selector
-2. Ideal skill composition editor
-3. Skill priority editor
-4. Unwanted skill editor
-5. Score preview
-6. Score explanation
+1. Ideal skill composition editor
+2. Skill priority editor
+3. Unwanted skill editor
+4. Score preview
+5. Score explanation
 
 ### Ideal Skill Composition Editor
 

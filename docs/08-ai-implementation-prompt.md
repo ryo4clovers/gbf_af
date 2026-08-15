@@ -1,5 +1,7 @@
 # AI Implementation Prompt
 
+> Note: Score profile references below are historical. Current implementations must use one `CustomScoreSettings` record and must not add profile creation, selection, or deletion.
+
 Use this prompt when asking Codex or Claude Code to implement changes in this repository.
 
 ```md

@@ -11,7 +11,7 @@ GBF Artifact Tool では、以下のデータを明確に分離する。
 - user review metadata
 - display mode state
 - game score
-- custom score profile / scoring policy
+- custom score settings / scoring policy
 - calculated custom score result
 - statistics result
 
@@ -42,7 +42,7 @@ Display mode:
   -> DisplayState
 
 Custom score:
-  -> ScoreProfile
+  -> CustomScoreSettings
   -> ScoreEvaluator
   -> ScoreResult
 ````
@@ -184,7 +184,7 @@ type Artifact = {
 Artifact
 -> observed normalized data
 
-ScoreProfile
+CustomScoreSettings
 -> user-defined scoring policy
 
 ScoreEvaluator
@@ -196,12 +196,12 @@ ScoreResult
 
 `customScore` を cache として利用する場合は、以下の invalidation が必要。
 
-* score profile が変わった
+* custom score settings が変わった
 * evaluator version が変わった
 * skill normalization logic が変わった
 * artifact data が変わった
 
-Phase 1 では、原則として `Artifact + ScoreProfile` から都度 `ScoreResult` を計算する。
+Phase 1 では、原則として `Artifact + CustomScoreSettings` から都度 `ScoreResult` を計算する。
 
 ## Artifact ID
 
@@ -419,7 +419,7 @@ GBF response の `skill_id`。
 用途:
 
 * skill normalization
-* score profile matching
+* custom score settings matching
 * raw name fallback の回避
 * debugging
 
@@ -802,7 +802,7 @@ artifactPresence
 将来追加候補:
 
 ```text
-scoreProfiles
+scoreSettings
 scoreSettings
 ```
 
@@ -916,15 +916,13 @@ Custom Score System は今後実装予定。
 
 Phase 1 では、自由数式エディタではなく rule/profile based scoring とする。
 
-### ScoreProfile
+### CustomScoreSettings
 
 ```ts
-type ScoreProfile = {
-  id: string;
-  name: string;
+type CustomScoreSettings = {
   idealSkillKeys: NormalizedSkillKey[];
+  idealMatchScores: IdealMatchScores;
   skillPriority: SkillPriorityEntry[];
-  createdAt: string;
   updatedAt: string;
 };
 ```
@@ -1131,7 +1129,7 @@ Artifact に含めてよいもの:
 Artifact に primary source として含めない方がよいもの:
 
 * user review metadata
-* score profile
+* custom score settings
 * calculated score result
 * statistics result
 
@@ -1141,9 +1139,9 @@ User review はユーザー所有データ。
 
 再スキャンで消してはいけない。
 
-### ScoreProfile
+### CustomScoreSettings
 
-Score profile はユーザー所有の scoring policy。
+Custom score settings はユーザー所有の単一 scoring policy。
 
 Artifact data とは独立させる。
 
@@ -1151,7 +1149,7 @@ Artifact data とは独立させる。
 
 Score result は計算結果。
 
-原則として `Artifact + ScoreProfile + Evaluator` から都度計算する。
+原則として `Artifact + CustomScoreSettings + Evaluator` から都度計算する。
 
 ### Statistics
 
@@ -1173,7 +1171,7 @@ legacy artifact data に presence record がない場合、backfill を行う。
 
 ### Future Score Migration
 
-Custom Score 実装時に `Artifact.customScore` が既に存在する場合でも、score profile based evaluation へ移行する。
+Custom Score 実装時に `Artifact.customScore` が既に存在する場合でも、settings-based evaluation へ移行する。
 
 方針:
 
@@ -1215,7 +1213,7 @@ Custom Score 実装時に `Artifact.customScore` が既に存在する場合で�
 
 * rating
 * memo
-* score profile
+* custom score settings
 * ideal skill keys
 * skill priority
 * unwanted skills
@@ -1224,7 +1222,7 @@ Custom Score 実装時に `Artifact.customScore` が既に存在する場合で�
 
 * rating は 0〜5
 * memo は string
-* score profile name は空文字を避ける
+* ideal match scores は 0 から 100 の整数で単調増加にする
 * skill keys は known catalog または fallback key
 * ideal skill composition は最大4つ
 * duplicate skill key の扱いは UI / evaluator で明確にする

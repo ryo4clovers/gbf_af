@@ -407,7 +407,7 @@ const SCORE_CATEGORY_MAP: Record<string, ScoreCategory> = {
 
 注意:
 
-* これはGBF側カテゴリであり、custom score profile の分類とは別物
+* これはGBF側カテゴリであり、custom score settings の分類とは別物
 * custom score の skill category は別途 normalized catalog で定義する可能性がある
 
 ## Raw Equip NPC Info
@@ -659,7 +659,7 @@ API response そのものを主データとして扱わず、正規化後の Art
 
 Custom Score について:
 
-* score profile / scoring policy は別 store に保存する
+* custom score settings / scoring policy は別 store に保存する
 * calculated score result は原則として都度計算する
 * cache する場合は evaluator version / profile version / normalization version で invalidation する
 

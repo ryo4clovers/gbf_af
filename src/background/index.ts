@@ -10,10 +10,11 @@ import {
 } from "../domain/displayMode";
 import { normalizeArtifact } from "../domain/normalizeArtifact";
 import type { ArtifactPresence, ScanSession } from "../domain/scanSession";
-import type {
-  ScoreProfile,
-  UnwantedSkillConfig,
-} from "../domain/score/scoreProfile";
+import {
+  type CustomScoreSettings,
+  type UnwantedSkillConfig,
+  validateIdealMatchScores,
+} from "../domain/score/customScoreSettings";
 import type {
   ErrorResponse,
   ExtensionMessage,
@@ -29,23 +30,19 @@ import {
   clearAllArtifacts,
   clearArtifactUserReviews,
   createScanSession,
-  deleteScoreProfile,
   finishActiveScanSession,
   getActiveScanSession,
   getAllArtifacts,
   getArtifactPresenceMap,
   getArtifactUserReviews,
+  getCustomScoreSettings,
   getLatestScanSession,
   getScanMetadata,
-  getScoreProfile,
-  getScoreProfiles,
-  getSelectedScoreProfileId,
   getUnwantedSkillConfig,
   markMissingArtifactsPossiblyDeleted,
   saveArtifactUserReview,
+  saveCustomScoreSettings,
   saveScannedArtifacts,
-  saveScoreProfile,
-  saveSelectedScoreProfileId,
   saveUnwantedSkillConfig,
   updateArtifactPresence,
   updateScanSession,
@@ -158,22 +155,14 @@ async function handleMessage(
       return getScanSessionsResponse();
     case "GET_ARTIFACT_PRESENCE":
       return getArtifactPresenceResponse();
-    case "GET_SCORE_PROFILES":
-      return getScoreProfilesResponse();
-    case "GET_SCORE_PROFILE":
-      return getScoreProfileResponse(message.profileId);
-    case "SAVE_SCORE_PROFILE":
-      return saveScoreProfileResponse(message.profile);
-    case "DELETE_SCORE_PROFILE":
-      return deleteScoreProfileResponse(message.profileId);
+    case "GET_CUSTOM_SCORE_SETTINGS":
+      return getCustomScoreSettingsResponse();
+    case "SAVE_CUSTOM_SCORE_SETTINGS":
+      return saveCustomScoreSettingsResponse(message.settings);
     case "GET_UNWANTED_SKILL_CONFIG":
       return getUnwantedSkillConfigResponse();
     case "SAVE_UNWANTED_SKILL_CONFIG":
       return saveUnwantedSkillConfigResponse(message.config);
-    case "GET_SELECTED_SCORE_PROFILE_ID":
-      return getSelectedScoreProfileIdResponse();
-    case "SAVE_SELECTED_SCORE_PROFILE_ID":
-      return saveSelectedScoreProfileIdResponse(message.profileId);
     case "OPEN_DASHBOARD":
       await chrome.tabs.create({
         url: chrome.runtime.getURL("dashboard.html"),
@@ -911,81 +900,39 @@ async function getArtifactPresenceResponse(): Promise<ExtensionResponse> {
   }
 }
 
-async function getScoreProfilesResponse(): Promise<ExtensionResponse> {
+async function getCustomScoreSettingsResponse(): Promise<ExtensionResponse> {
   try {
     return {
       ok: true,
-      type: "SCORE_PROFILES",
-      profiles: await getScoreProfiles(),
+      type: "CUSTOM_SCORE_SETTINGS",
+      settings: await getCustomScoreSettings(),
     };
   } catch (error) {
-    logDebugError("Could not read score profiles", error);
-    return storageErrorResponse("Could not read score profiles.");
+    logDebugError("Could not read custom score settings", error);
+    return storageErrorResponse("Could not read custom score settings.");
   }
 }
 
-async function getScoreProfileResponse(
-  profileId: string,
+async function saveCustomScoreSettingsResponse(
+  settings: CustomScoreSettings,
 ): Promise<ExtensionResponse> {
-  if (!isNonEmptyString(profileId)) {
-    return validationMessageResponse("Score profile id is required.");
-  }
-
-  try {
-    return {
-      ok: true,
-      type: "SCORE_PROFILE",
-      profile: await getScoreProfile(profileId),
-    };
-  } catch (error) {
-    logDebugError("Could not read score profile", error, { profileId });
-    return storageErrorResponse("Could not read score profile.");
-  }
-}
-
-async function saveScoreProfileResponse(
-  profile: ScoreProfile,
-): Promise<ExtensionResponse> {
-  const validationError = validateScoreProfile(profile);
+  const validationError = validateCustomScoreSettings(settings);
 
   if (validationError !== null) {
     return validationMessageResponse(validationError);
   }
 
   try {
-    await saveScoreProfile(profile);
+    await saveCustomScoreSettings(settings);
 
     return {
       ok: true,
-      type: "SAVE_SCORE_PROFILE_RESULT",
-      profile,
+      type: "SAVE_CUSTOM_SCORE_SETTINGS_RESULT",
+      settings,
     };
   } catch (error) {
-    logDebugError("Could not save score profile", error, {
-      profileId: profile.id,
-    });
-    return storageErrorResponse("Could not save score profile.");
-  }
-}
-
-async function deleteScoreProfileResponse(
-  profileId: string,
-): Promise<ExtensionResponse> {
-  if (!isNonEmptyString(profileId)) {
-    return validationMessageResponse("Score profile id is required.");
-  }
-
-  try {
-    await deleteScoreProfile(profileId);
-
-    return {
-      ok: true,
-      type: "DELETE_SCORE_PROFILE_RESULT",
-      profileId,
-    };
-  } catch (error) {
-    logDebugError("Could not delete score profile", error, { profileId });
-    return storageErrorResponse("Could not delete score profile.");
+    logDebugError("Could not save custom score settings", error);
+    return storageErrorResponse("Could not save custom score settings.");
   }
 }
 
@@ -1022,48 +969,6 @@ async function saveUnwantedSkillConfigResponse(
   } catch (error) {
     logDebugError("Could not save unwanted skill config", error);
     return storageErrorResponse("Could not save unwanted skill config.");
-  }
-}
-
-async function getSelectedScoreProfileIdResponse(): Promise<ExtensionResponse> {
-  try {
-    return {
-      ok: true,
-      type: "SELECTED_SCORE_PROFILE_ID",
-      profileId: await getSelectedScoreProfileId(),
-    };
-  } catch (error) {
-    logDebugError("Could not read selected score profile id", error);
-    return storageErrorResponse("Could not read selected score profile.");
-  }
-}
-
-async function saveSelectedScoreProfileIdResponse(
-  profileId: string | null,
-): Promise<ExtensionResponse> {
-  if (profileId !== null && !isNonEmptyString(profileId)) {
-    return validationMessageResponse("Selected score profile id is invalid.");
-  }
-
-  try {
-    if (profileId !== null && (await getScoreProfile(profileId)) === null) {
-      return validationMessageResponse(
-        "Selected score profile does not exist.",
-      );
-    }
-
-    await saveSelectedScoreProfileId(profileId);
-
-    return {
-      ok: true,
-      type: "SAVE_SELECTED_SCORE_PROFILE_ID_RESULT",
-      profileId,
-    };
-  } catch (error) {
-    logDebugError("Could not save selected score profile id", error, {
-      profileId,
-    });
-    return storageErrorResponse("Could not save selected score profile.");
   }
 }
 
@@ -1318,30 +1223,32 @@ function validationMessageResponse(message: string): ErrorResponse {
   };
 }
 
-function validateScoreProfile(profile: ScoreProfile): string | null {
-  if (!isNonEmptyString(profile.id)) {
-    return "Score profile id is required.";
+function validateCustomScoreSettings(
+  settings: CustomScoreSettings,
+): string | null {
+  if (settings.idealSkillKeys.length > 4) {
+    return "Ideal skills must contain at most 4 skills.";
   }
 
-  if (!isNonEmptyString(profile.name)) {
-    return "Score profile name is required.";
+  if (!settings.idealSkillKeys.every(isNonEmptyString)) {
+    return "Ideal skill keys must be non-empty strings.";
   }
 
-  if (profile.idealSkillKeys.length > 4) {
-    return "Score profile ideal skills must contain at most 4 skills.";
+  const idealMatchScoreError = validateIdealMatchScores(
+    settings.idealMatchScores,
+  );
+
+  if (idealMatchScoreError !== null) {
+    return idealMatchScoreError;
   }
 
-  if (!profile.idealSkillKeys.every(isNonEmptyString)) {
-    return "Score profile ideal skill keys must be non-empty strings.";
-  }
-
-  for (const entry of profile.skillPriority) {
+  for (const entry of settings.skillPriority) {
     if (!isNonEmptyString(entry.skillKey)) {
-      return "Score profile priority skill keys must be non-empty strings.";
+      return "Priority skill keys must be non-empty strings.";
     }
 
     if (!Number.isFinite(entry.rank) || entry.rank < 1) {
-      return "Score profile priority ranks must be positive numbers.";
+      return "Priority ranks must be positive numbers.";
     }
   }
 

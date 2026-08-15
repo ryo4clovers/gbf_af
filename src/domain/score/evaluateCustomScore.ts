@@ -1,13 +1,16 @@
 import type { Artifact } from "../artifact";
 import { normalizeArtifactSkills } from "../skill/normalizeSkill";
+import type {
+  CustomScoreSettings,
+  UnwantedSkillConfig,
+} from "./customScoreSettings";
 import { evaluateIdealRoute } from "./evaluateIdealRoute";
 import { evaluatePriorityRoute } from "./evaluatePriorityRoute";
-import type { ScoreProfile, UnwantedSkillConfig } from "./scoreProfile";
 import type { ScoreResult } from "./scoreResult";
 
 export type EvaluateCustomScoreInput = {
   artifact: Artifact;
-  profile: ScoreProfile;
+  settings: CustomScoreSettings;
   unwantedSkillConfig: UnwantedSkillConfig;
 };
 
@@ -17,11 +20,11 @@ export function evaluateCustomScore(
   const skills = normalizeArtifactSkills(input.artifact.skills);
   const idealRoute = evaluateIdealRoute({
     skills,
-    profile: input.profile,
+    settings: input.settings,
   });
   const priorityRoute = evaluatePriorityRoute({
     skills,
-    profile: input.profile,
+    settings: input.settings,
     unwantedSkillConfig: input.unwantedSkillConfig,
   });
   const selectedRoute =

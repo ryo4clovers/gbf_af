@@ -7,13 +7,15 @@ import type {
   ArtifactUserReview,
 } from "../domain/artifactUserReview";
 import type { ArtifactPresence } from "../domain/scanSession";
-import { evaluateCustomScore } from "../domain/score/evaluateCustomScore";
 import {
-  DEFAULT_SCORE_PROFILE,
+  type CustomScoreSettings,
+  DEFAULT_CUSTOM_SCORE_SETTINGS,
   DEFAULT_UNWANTED_SKILL_CONFIG,
-  type ScoreProfile,
+  type IdealMatchScores,
   type UnwantedSkillConfig,
-} from "../domain/score/scoreProfile";
+  validateIdealMatchScores,
+} from "../domain/score/customScoreSettings";
+import { evaluateCustomScore } from "../domain/score/evaluateCustomScore";
 import type { ScoreReason, ScoreResult } from "../domain/score/scoreResult";
 import {
   getSkillCatalogOptions,
@@ -31,9 +33,16 @@ type LockedFilter = "all" | "locked" | "unlocked";
 type EquippedFilter = "all" | "equipped" | "unequipped";
 type RatingFilter = "all" | "unrated" | "1" | "2" | "3" | "4" | "5";
 type LifecycleFilter = "all" | "active" | "possiblyDeleted";
-type SortKey = "totalScore" | "ownedId" | "name" | "rating" | "customScore";
+type SortKey =
+  | "totalScore"
+  | "ownedId"
+  | "rating"
+  | "customScore"
+  | "attributeOrder"
+  | "kindOrder";
 type SortDirection = "asc" | "desc";
 type DashboardTab = "list" | "scoreSettings" | "statistics";
+type DashboardTheme = "fantasy" | "cyber";
 
 type ArtifactFilters = {
   searchText: string;
@@ -68,9 +77,46 @@ type ReviewedArtifactRow = {
 };
 
 const skillCatalogOptions = getSkillCatalogOptions();
+const DASHBOARD_THEME_STORAGE_KEY = "gbf-af-dashboard-theme";
+const ATTRIBUTE_ORDER = ["火", "水", "土", "風", "光", "闇"] as const;
+const KIND_ORDER = [
+  "kind-1",
+  "kind-2",
+  "kind-3",
+  "kind-4",
+  "kind-5",
+  "kind-6",
+  "kind-7",
+  "kind-8",
+  "kind-9",
+  "kind-10",
+] as const;
+const KIND_LABELS: Record<string, string> = {
+  "kind-1": "剣",
+  "kind-2": "短剣",
+  "kind-3": "槍",
+  "kind-4": "斧",
+  "kind-5": "杖",
+  "kind-6": "銃",
+  "kind-7": "格闘",
+  "kind-8": "弓",
+  "kind-9": "楽器",
+  "kind-10": "刀",
+};
+
+function getInitialDashboardTheme(): DashboardTheme {
+  const savedTheme = window.localStorage.getItem(DASHBOARD_THEME_STORAGE_KEY);
+
+  return savedTheme === "cyber" || savedTheme === "fantasy"
+    ? savedTheme
+    : "fantasy";
+}
 
 function Dashboard() {
   const { scan, setScanState } = useAppStore();
+  const [dashboardTheme, setDashboardTheme] = useState<DashboardTheme>(
+    getInitialDashboardTheme,
+  );
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [reviewsByOwnedId, setReviewsByOwnedId] = useState<
     Record<number, ArtifactUserReview>
@@ -78,20 +124,18 @@ function Dashboard() {
   const [presenceByOwnedId, setPresenceByOwnedId] = useState<
     Record<number, ArtifactPresence>
   >({});
-  const [scoreProfiles, setScoreProfiles] = useState<ScoreProfile[]>([
-    DEFAULT_SCORE_PROFILE,
-  ]);
-  const [selectedScoreProfileId, setSelectedScoreProfileId] = useState<
-    string | null
-  >(DEFAULT_SCORE_PROFILE.id);
+  const [customScoreSettings, setCustomScoreSettings] =
+    useState<CustomScoreSettings>(DEFAULT_CUSTOM_SCORE_SETTINGS);
   const [unwantedSkillConfig, setUnwantedSkillConfig] =
     useState<UnwantedSkillConfig>(DEFAULT_UNWANTED_SKILL_CONFIG);
-  const [scoreProfileError, setScoreProfileError] = useState<string | null>(
+  const [scoreSettingsError, setScoreSettingsError] = useState<string | null>(
     null,
   );
-  const [newScoreProfileName, setNewScoreProfileName] = useState("");
   const [selectedIdealSkillKey, setSelectedIdealSkillKey] = useState("");
   const [idealSkillError, setIdealSkillError] = useState<string | null>(null);
+  const [idealMatchScoreError, setIdealMatchScoreError] = useState<
+    string | null
+  >(null);
   const [selectedPrioritySkillKey, setSelectedPrioritySkillKey] = useState("");
   const [prioritySkillError, setPrioritySkillError] = useState<string | null>(
     null,
@@ -109,16 +153,12 @@ function Dashboard() {
   const [statusMessage, setStatusMessage] = useState("Loading artifacts...");
   const [activeDashboardTab, setActiveDashboardTab] =
     useState<DashboardTab>("list");
-  const activeScoreProfile = getActiveScoreProfile(
-    scoreProfiles,
-    selectedScoreProfileId,
-  );
   const artifactRows = artifacts.map((artifact) =>
     buildArtifactScoreViewModel({
       artifact,
       review: reviewsByOwnedId[artifact.ownedId] ?? null,
       presence: presenceByOwnedId[artifact.ownedId] ?? null,
-      scoreProfile: activeScoreProfile,
+      scoreSettings: customScoreSettings,
       unwantedSkillConfig,
     }),
   );
@@ -135,6 +175,11 @@ function Dashboard() {
   const attributeOptions = getAttributeOptions(artifacts);
   const kindOptions = getKindOptions(artifacts);
 
+  useEffect(() => {
+    document.documentElement.dataset.theme = dashboardTheme;
+    window.localStorage.setItem(DASHBOARD_THEME_STORAGE_KEY, dashboardTheme);
+  }, [dashboardTheme]);
+
   const loadArtifacts = useCallback(async () => {
     setIsLoading(true);
     setStatusMessage("Loading artifacts...");
@@ -143,15 +188,13 @@ function Dashboard() {
       artifactResponse,
       reviewResponse,
       presenceResponse,
-      scoreProfilesResponse,
-      selectedScoreProfileResponse,
+      customScoreSettingsResponse,
       unwantedSkillConfigResponse,
     ] = await Promise.all([
       sendRuntimeMessage({ type: "GET_STORED_ARTIFACTS" }),
       sendRuntimeMessage({ type: "GET_ARTIFACT_USER_REVIEWS" }),
       sendRuntimeMessage({ type: "GET_ARTIFACT_PRESENCE" }),
-      sendRuntimeMessage({ type: "GET_SCORE_PROFILES" }),
-      sendRuntimeMessage({ type: "GET_SELECTED_SCORE_PROFILE_ID" }),
+      sendRuntimeMessage({ type: "GET_CUSTOM_SCORE_SETTINGS" }),
       sendRuntimeMessage({ type: "GET_UNWANTED_SKILL_CONFIG" }),
     ]);
 
@@ -191,23 +234,13 @@ function Dashboard() {
     }
 
     if (
-      scoreProfilesResponse.ok &&
-      scoreProfilesResponse.type === "SCORE_PROFILES"
+      customScoreSettingsResponse.ok &&
+      customScoreSettingsResponse.type === "CUSTOM_SCORE_SETTINGS"
     ) {
-      setScoreProfiles(scoreProfilesResponse.profiles);
+      setCustomScoreSettings(customScoreSettingsResponse.settings);
     } else {
-      setScoreProfiles([DEFAULT_SCORE_PROFILE]);
-      setScoreProfileError("Custom score profile could not be loaded.");
-    }
-
-    if (
-      selectedScoreProfileResponse.ok &&
-      selectedScoreProfileResponse.type === "SELECTED_SCORE_PROFILE_ID"
-    ) {
-      setSelectedScoreProfileId(selectedScoreProfileResponse.profileId);
-    } else {
-      setSelectedScoreProfileId(DEFAULT_SCORE_PROFILE.id);
-      setScoreProfileError("Custom score profile could not be loaded.");
+      setCustomScoreSettings(DEFAULT_CUSTOM_SCORE_SETTINGS);
+      setScoreSettingsError("スコア設定を読み込めませんでした。");
     }
 
     if (
@@ -217,15 +250,11 @@ function Dashboard() {
       setUnwantedSkillConfig(unwantedSkillConfigResponse.config);
     } else {
       setUnwantedSkillConfig(DEFAULT_UNWANTED_SKILL_CONFIG);
-      setScoreProfileError("Custom score profile could not be loaded.");
+      setUnwantedSkillError("不要スキル設定を読み込めませんでした。");
     }
 
-    if (
-      scoreProfilesResponse.ok &&
-      selectedScoreProfileResponse.ok &&
-      unwantedSkillConfigResponse.ok
-    ) {
-      setScoreProfileError(null);
+    if (customScoreSettingsResponse.ok) {
+      setScoreSettingsError(null);
     }
 
     setStatusMessage(
@@ -293,162 +322,84 @@ function Dashboard() {
     }
   };
 
-  const saveSelectedScoreProfile = async (
-    profileId: string,
+  const saveScoreSettings = async (
+    settings: CustomScoreSettings,
+    setError: (message: string | null) => void,
+    errorMessage: string,
   ): Promise<boolean> => {
-    setSelectedScoreProfileId(profileId);
-    setScoreProfileError(null);
+    setError(null);
 
     const response = await sendRuntimeMessage({
-      type: "SAVE_SELECTED_SCORE_PROFILE_ID",
-      profileId,
+      type: "SAVE_CUSTOM_SCORE_SETTINGS",
+      settings,
     });
 
     if (!response.ok) {
-      setScoreProfileError("Could not save selected score profile.");
+      setError(errorMessage);
       return false;
     }
 
-    if (response.type === "SAVE_SELECTED_SCORE_PROFILE_ID_RESULT") {
-      setSelectedScoreProfileId(response.profileId);
+    if (response.type === "SAVE_CUSTOM_SCORE_SETTINGS_RESULT") {
+      setCustomScoreSettings(response.settings);
     }
 
     return true;
   };
 
-  const createScoreProfile = async () => {
-    const profileName = newScoreProfileName.trim();
+  const saveIdealMatchScores = async (scores: IdealMatchScores) => {
+    const validationError = validateIdealMatchScores(scores);
 
-    if (profileName.length === 0) {
-      setScoreProfileError("Profile name is required.");
+    if (validationError !== null) {
+      setIdealMatchScoreError(
+        "スコアは0～100の整数で、一致数が増えるほど低くならないように設定してください。",
+      );
       return;
     }
 
-    const timestamp = new Date().toISOString();
-    const profile: ScoreProfile = {
-      id: `profile-${Date.now()}`,
-      name: profileName,
-      idealSkillKeys: [...activeScoreProfile.idealSkillKeys],
-      skillPriority: activeScoreProfile.skillPriority.map((entry) => ({
-        ...entry,
-      })),
-      createdAt: timestamp,
-      updatedAt: timestamp,
+    setIdealMatchScoreError(null);
+    const settings: CustomScoreSettings = {
+      ...customScoreSettings,
+      idealMatchScores: scores,
+      updatedAt: new Date().toISOString(),
     };
 
-    setScoreProfileError(null);
-
-    const saveProfileResponse = await sendRuntimeMessage({
-      type: "SAVE_SCORE_PROFILE",
-      profile,
-    });
-
-    if (!saveProfileResponse.ok) {
-      setScoreProfileError("Could not create score profile.");
-      return;
-    }
-
-    setScoreProfiles((current) => [
-      ...current.filter((currentProfile) => currentProfile.id !== profile.id),
-      profile,
-    ]);
-
-    const didSaveSelection = await saveSelectedScoreProfile(profile.id);
-
-    if (didSaveSelection) {
-      setNewScoreProfileName("");
-    }
-  };
-
-  const deleteActiveScoreProfile = async () => {
-    const availableProfiles =
-      scoreProfiles.length > 0 ? scoreProfiles : [DEFAULT_SCORE_PROFILE];
-
-    if (availableProfiles.length <= 1) {
-      setScoreProfileError("At least one score profile is required.");
-      return;
-    }
-
-    if (!window.confirm("Delete this score profile?")) {
-      return;
-    }
-
-    setScoreProfileError(null);
-
-    const deleteResponse = await sendRuntimeMessage({
-      type: "DELETE_SCORE_PROFILE",
-      profileId: activeScoreProfile.id,
-    });
-
-    if (!deleteResponse.ok) {
-      setScoreProfileError("Could not delete score profile.");
-      return;
-    }
-
-    const remainingProfiles = availableProfiles.filter(
-      (profile) => profile.id !== activeScoreProfile.id,
+    await saveScoreSettings(
+      settings,
+      setIdealMatchScoreError,
+      "一致数スコアを保存できませんでした。",
     );
-    const fallbackProfile = remainingProfiles[0] ?? DEFAULT_SCORE_PROFILE;
-
-    setScoreProfiles(
-      remainingProfiles.length > 0
-        ? remainingProfiles
-        : [DEFAULT_SCORE_PROFILE],
-    );
-
-    await saveSelectedScoreProfile(fallbackProfile.id);
-  };
-
-  const saveIdealSkillProfile = async (
-    profile: ScoreProfile,
-  ): Promise<boolean> => {
-    setIdealSkillError(null);
-
-    const response = await sendRuntimeMessage({
-      type: "SAVE_SCORE_PROFILE",
-      profile,
-    });
-
-    if (!response.ok) {
-      setIdealSkillError("Could not save ideal skills.");
-      return false;
-    }
-
-    if (response.type === "SAVE_SCORE_PROFILE_RESULT") {
-      setScoreProfiles((current) =>
-        replaceScoreProfile(current, response.profile),
-      );
-    }
-
-    return true;
   };
 
   const addIdealSkill = async () => {
     if (selectedIdealSkillKey.length === 0) {
-      setIdealSkillError("Select a skill to add.");
+      setIdealSkillError("追加するスキルを選択してください。");
       return;
     }
 
-    if (activeScoreProfile.idealSkillKeys.includes(selectedIdealSkillKey)) {
-      setIdealSkillError("This skill is already selected.");
+    if (customScoreSettings.idealSkillKeys.includes(selectedIdealSkillKey)) {
+      setIdealSkillError("このスキルはすでに選択されています。");
       return;
     }
 
-    if (activeScoreProfile.idealSkillKeys.length >= 4) {
-      setIdealSkillError("Ideal skills can contain up to 4 skills.");
+    if (customScoreSettings.idealSkillKeys.length >= 4) {
+      setIdealSkillError("理想スキルは4つまで選択できます。");
       return;
     }
 
-    const nextProfile: ScoreProfile = {
-      ...activeScoreProfile,
+    const nextSettings: CustomScoreSettings = {
+      ...customScoreSettings,
       idealSkillKeys: [
-        ...activeScoreProfile.idealSkillKeys,
+        ...customScoreSettings.idealSkillKeys,
         selectedIdealSkillKey,
       ],
       updatedAt: new Date().toISOString(),
     };
 
-    const didSave = await saveIdealSkillProfile(nextProfile);
+    const didSave = await saveScoreSettings(
+      nextSettings,
+      setIdealSkillError,
+      "理想スキルを保存できませんでした。",
+    );
 
     if (didSave) {
       setSelectedIdealSkillKey("");
@@ -456,70 +407,54 @@ function Dashboard() {
   };
 
   const removeIdealSkill = async (skillKey: string) => {
-    const nextProfile: ScoreProfile = {
-      ...activeScoreProfile,
-      idealSkillKeys: activeScoreProfile.idealSkillKeys.filter(
+    const nextSettings: CustomScoreSettings = {
+      ...customScoreSettings,
+      idealSkillKeys: customScoreSettings.idealSkillKeys.filter(
         (currentSkillKey) => currentSkillKey !== skillKey,
       ),
       updatedAt: new Date().toISOString(),
     };
 
-    await saveIdealSkillProfile(nextProfile);
-  };
-
-  const saveSkillPriorityProfile = async (
-    profile: ScoreProfile,
-  ): Promise<boolean> => {
-    setPrioritySkillError(null);
-
-    const response = await sendRuntimeMessage({
-      type: "SAVE_SCORE_PROFILE",
-      profile,
-    });
-
-    if (!response.ok) {
-      setPrioritySkillError("Could not save skill priority.");
-      return false;
-    }
-
-    if (response.type === "SAVE_SCORE_PROFILE_RESULT") {
-      setScoreProfiles((current) =>
-        replaceScoreProfile(current, response.profile),
-      );
-    }
-
-    return true;
+    await saveScoreSettings(
+      nextSettings,
+      setIdealSkillError,
+      "理想スキルを保存できませんでした。",
+    );
   };
 
   const addPrioritySkill = async () => {
     if (selectedPrioritySkillKey.length === 0) {
-      setPrioritySkillError("Select a skill to add.");
+      setPrioritySkillError("追加するスキルを選択してください。");
       return;
     }
 
     if (
-      activeScoreProfile.skillPriority.some(
+      customScoreSettings.skillPriority.some(
         (entry) => entry.skillKey === selectedPrioritySkillKey,
       )
     ) {
-      setPrioritySkillError("This skill is already selected.");
+      setPrioritySkillError("このスキルはすでに選択されています。");
       return;
     }
 
     const nextSkillPriority = reassignSkillPriorityRanks([
-      ...getSortedSkillPriorityEntries(activeScoreProfile.skillPriority),
+      ...getSortedSkillPriorityEntries(customScoreSettings.skillPriority),
       {
         skillKey: selectedPrioritySkillKey,
-        rank: activeScoreProfile.skillPriority.length + 1,
+        rank: customScoreSettings.skillPriority.length + 1,
       },
     ]);
-    const nextProfile: ScoreProfile = {
-      ...activeScoreProfile,
+    const nextSettings: CustomScoreSettings = {
+      ...customScoreSettings,
       skillPriority: nextSkillPriority,
       updatedAt: new Date().toISOString(),
     };
 
-    const didSave = await saveSkillPriorityProfile(nextProfile);
+    const didSave = await saveScoreSettings(
+      nextSettings,
+      setPrioritySkillError,
+      "スキル優先度を保存できませんでした。",
+    );
 
     if (didSave) {
       setSelectedPrioritySkillKey("");
@@ -528,22 +463,26 @@ function Dashboard() {
 
   const removePrioritySkill = async (skillKey: string) => {
     const nextSkillPriority = reassignSkillPriorityRanks(
-      getSortedSkillPriorityEntries(activeScoreProfile.skillPriority).filter(
+      getSortedSkillPriorityEntries(customScoreSettings.skillPriority).filter(
         (entry) => entry.skillKey !== skillKey,
       ),
     );
-    const nextProfile: ScoreProfile = {
-      ...activeScoreProfile,
+    const nextSettings: CustomScoreSettings = {
+      ...customScoreSettings,
       skillPriority: nextSkillPriority,
       updatedAt: new Date().toISOString(),
     };
 
-    await saveSkillPriorityProfile(nextProfile);
+    await saveScoreSettings(
+      nextSettings,
+      setPrioritySkillError,
+      "スキル優先度を保存できませんでした。",
+    );
   };
 
   const movePrioritySkill = async (skillKey: string, direction: -1 | 1) => {
     const sortedSkillPriority = getSortedSkillPriorityEntries(
-      activeScoreProfile.skillPriority,
+      customScoreSettings.skillPriority,
     );
     const currentIndex = sortedSkillPriority.findIndex(
       (entry) => entry.skillKey === skillKey,
@@ -569,13 +508,17 @@ function Dashboard() {
     reorderedSkillPriority[currentIndex] = nextEntry;
     reorderedSkillPriority[nextIndex] = currentEntry;
 
-    const nextProfile: ScoreProfile = {
-      ...activeScoreProfile,
+    const nextSettings: CustomScoreSettings = {
+      ...customScoreSettings,
       skillPriority: reassignSkillPriorityRanks(reorderedSkillPriority),
       updatedAt: new Date().toISOString(),
     };
 
-    await saveSkillPriorityProfile(nextProfile);
+    await saveScoreSettings(
+      nextSettings,
+      setPrioritySkillError,
+      "スキル優先度を保存できませんでした。",
+    );
   };
 
   const saveUnwantedSkills = async (
@@ -589,7 +532,7 @@ function Dashboard() {
     });
 
     if (!response.ok) {
-      setUnwantedSkillError("Could not save unwanted skills.");
+      setUnwantedSkillError("不要スキルを保存できませんでした。");
       return false;
     }
 
@@ -602,12 +545,12 @@ function Dashboard() {
 
   const addUnwantedSkill = async () => {
     if (selectedUnwantedSkillKey.length === 0) {
-      setUnwantedSkillError("Select a skill to add.");
+      setUnwantedSkillError("追加するスキルを選択してください。");
       return;
     }
 
     if (unwantedSkillConfig.skillKeys.includes(selectedUnwantedSkillKey)) {
-      setUnwantedSkillError("This skill is already selected.");
+      setUnwantedSkillError("このスキルはすでに選択されています。");
       return;
     }
 
@@ -657,13 +600,27 @@ function Dashboard() {
           <h1>GBF Artifact Manager</h1>
           <p>Local read-only artifact management workspace</p>
         </div>
-        <button
-          type="button"
-          onClick={exportCsv}
-          disabled={filteredRows.length === 0}
-        >
-          Export CSV
-        </button>
+        <div className="topBarActions">
+          <label className="themeSelector">
+            Theme
+            <select
+              value={dashboardTheme}
+              onChange={(event) =>
+                setDashboardTheme(event.currentTarget.value as DashboardTheme)
+              }
+            >
+              <option value="fantasy">Fantasy</option>
+              <option value="cyber">Cyber</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            onClick={exportCsv}
+            disabled={filteredRows.length === 0}
+          >
+            Export CSV
+          </button>
+        </div>
       </header>
 
       <section className="scanResultSummary" aria-label="スキャン結果">
@@ -791,24 +748,22 @@ function Dashboard() {
               role="tabpanel"
               aria-labelledby="dashboard-tab-score-settings"
             >
-              <CustomScoreProfileSummary
-                activeProfile={activeScoreProfile}
-                newProfileName={newScoreProfileName}
-                errorMessage={scoreProfileError}
-                profiles={scoreProfiles}
-                onCreateProfile={createScoreProfile}
-                onDeleteProfile={deleteActiveScoreProfile}
-                onNewProfileNameChange={setNewScoreProfileName}
-                onProfileChange={saveSelectedScoreProfile}
-              />
+              {scoreSettingsError !== null && (
+                <p className="errorText">{scoreSettingsError}</p>
+              )}
               <IdealSkillEditor
                 errorMessage={idealSkillError}
-                idealSkillKeys={activeScoreProfile.idealSkillKeys}
+                idealSkillKeys={customScoreSettings.idealSkillKeys}
                 onAddSkill={addIdealSkill}
                 onRemoveSkill={removeIdealSkill}
                 onSelectedSkillChange={setSelectedIdealSkillKey}
                 options={skillCatalogOptions}
                 selectedSkillKey={selectedIdealSkillKey}
+              />
+              <IdealMatchScoreEditor
+                errorMessage={idealMatchScoreError}
+                onSave={saveIdealMatchScores}
+                settings={customScoreSettings}
               />
               <SkillPriorityEditor
                 errorMessage={prioritySkillError}
@@ -818,11 +773,8 @@ function Dashboard() {
                 onSelectedSkillChange={setSelectedPrioritySkillKey}
                 options={skillCatalogOptions}
                 selectedSkillKey={selectedPrioritySkillKey}
-                skillPriority={activeScoreProfile.skillPriority}
+                skillPriority={customScoreSettings.skillPriority}
               />
-              <p className="mutedText">
-                Global setting shared by all score profiles.
-              </p>
               <UnwantedSkillEditor
                 errorMessage={unwantedSkillError}
                 onAddSkill={addUnwantedSkill}
@@ -911,69 +863,6 @@ function StatisticsSummary({ statistics }: { statistics: ArtifactStatistics }) {
   );
 }
 
-function CustomScoreProfileSummary({
-  activeProfile,
-  newProfileName,
-  errorMessage,
-  profiles,
-  onCreateProfile,
-  onDeleteProfile,
-  onNewProfileNameChange,
-  onProfileChange,
-}: {
-  activeProfile: ScoreProfile;
-  newProfileName: string;
-  errorMessage: string | null;
-  profiles: ScoreProfile[];
-  onCreateProfile: () => void;
-  onDeleteProfile: () => void;
-  onNewProfileNameChange: (name: string) => void;
-  onProfileChange: (profileId: string) => void;
-}) {
-  const profileOptions =
-    profiles.length > 0 ? profiles : [DEFAULT_SCORE_PROFILE];
-
-  return (
-    <section className="customScoreProfileSummary" aria-label="Custom score">
-      <div className="scoreProfileRow">
-        <label>
-          Custom Score Profile
-          <select
-            value={activeProfile.id}
-            onChange={(event) => onProfileChange(event.currentTarget.value)}
-          >
-            {profileOptions.map((profile) => (
-              <option key={profile.id} value={profile.id}>
-                {profile.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="button" onClick={onDeleteProfile}>
-          Delete
-        </button>
-      </div>
-      <div className="scoreProfileRow">
-        <label>
-          New profile
-          <input
-            type="text"
-            value={newProfileName}
-            onChange={(event) =>
-              onNewProfileNameChange(event.currentTarget.value)
-            }
-            placeholder="Profile name"
-          />
-        </label>
-        <button type="button" onClick={onCreateProfile}>
-          Create Profile
-        </button>
-      </div>
-      {errorMessage !== null && <p>{errorMessage}</p>}
-    </section>
-  );
-}
-
 function IdealSkillEditor({
   errorMessage,
   idealSkillKeys,
@@ -992,10 +881,10 @@ function IdealSkillEditor({
   selectedSkillKey: string;
 }) {
   return (
-    <section className="idealSkillEditor" aria-label="Ideal skills">
-      <h3>Ideal Skills</h3>
+    <section className="idealSkillEditor" aria-label="理想スキル">
+      <h3>理想スキル</h3>
       {idealSkillKeys.length === 0 ? (
-        <p className="mutedText">No ideal skills selected.</p>
+        <p className="mutedText">理想スキルが選択されていません。</p>
       ) : (
         <div className="scoreSkillChips">
           {idealSkillKeys.map((skillKey) => (
@@ -1004,23 +893,23 @@ function IdealSkillEditor({
               key={skillKey}
               type="button"
               onClick={() => onRemoveSkill(skillKey)}
-              title="Remove ideal skill"
+              title="理想スキルから削除"
             >
-              {getSkillOptionLabel(skillKey, options)} x
+              {getSkillOptionLabel(skillKey, options)} ×
             </button>
           ))}
         </div>
       )}
-      <div className="scoreProfileRow">
+      <div className="scoreSettingRow">
         <label>
-          Add ideal skill
+          理想スキルを追加
           <select
             value={selectedSkillKey}
             onChange={(event) =>
               onSelectedSkillChange(event.currentTarget.value)
             }
           >
-            <option value="">Select skill</option>
+            <option value="">スキルを選択</option>
             {options.map((option) => (
               <option key={option.key} value={option.key}>
                 {option.label}
@@ -1029,9 +918,66 @@ function IdealSkillEditor({
           </select>
         </label>
         <button type="button" onClick={onAddSkill}>
-          Add
+          追加
         </button>
       </div>
+      {errorMessage !== null && <p className="errorText">{errorMessage}</p>}
+    </section>
+  );
+}
+
+function IdealMatchScoreEditor({
+  errorMessage,
+  onSave,
+  settings,
+}: {
+  errorMessage: string | null;
+  onSave: (scores: IdealMatchScores) => Promise<void>;
+  settings: CustomScoreSettings;
+}) {
+  const [draftScores, setDraftScores] = useState<IdealMatchScores>(() => ({
+    ...settings.idealMatchScores,
+  }));
+
+  useEffect(() => {
+    setDraftScores({ ...settings.idealMatchScores });
+  }, [settings.idealMatchScores]);
+
+  const updateDraftScore = (matchCount: 1 | 2 | 3 | 4, value: string) => {
+    const parsedValue = Number.parseInt(value, 10);
+
+    setDraftScores((current) => ({
+      ...current,
+      [matchCount]: Number.isNaN(parsedValue) ? 0 : parsedValue,
+    }));
+  };
+
+  return (
+    <section className="idealMatchScoreEditor" aria-label="一致数スコア">
+      <h3>一致数スコア</h3>
+      <p className="mutedText">
+        理想スキルの一致数ごとの基礎スコアです。テーブルランク補正は、この基礎スコアへ後から適用されます。
+      </p>
+      <div className="idealMatchScoreGrid">
+        {([1, 2, 3, 4] as const).map((matchCount) => (
+          <label key={matchCount}>
+            {matchCount} / 4 一致
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step={1}
+              value={draftScores[matchCount]}
+              onChange={(event) =>
+                updateDraftScore(matchCount, event.currentTarget.value)
+              }
+            />
+          </label>
+        ))}
+      </div>
+      <button type="button" onClick={() => onSave({ ...draftScores })}>
+        一致数スコアを保存
+      </button>
       {errorMessage !== null && <p className="errorText">{errorMessage}</p>}
     </section>
   );
@@ -1055,10 +1001,10 @@ function UnwantedSkillEditor({
   unwantedSkillKeys: string[];
 }) {
   return (
-    <section className="unwantedSkillEditor" aria-label="Unwanted skills">
-      <h3>Unwanted Skills</h3>
+    <section className="unwantedSkillEditor" aria-label="不要スキル">
+      <h3>不要スキル</h3>
       {unwantedSkillKeys.length === 0 ? (
-        <p className="mutedText">No unwanted skills selected.</p>
+        <p className="mutedText">不要スキルが選択されていません。</p>
       ) : (
         <div className="scoreSkillChips">
           {unwantedSkillKeys.map((skillKey) => (
@@ -1067,23 +1013,23 @@ function UnwantedSkillEditor({
               key={skillKey}
               type="button"
               onClick={() => onRemoveSkill(skillKey)}
-              title="Remove unwanted skill"
+              title="不要スキルから削除"
             >
-              {getSkillOptionLabel(skillKey, options)} x
+              {getSkillOptionLabel(skillKey, options)} ×
             </button>
           ))}
         </div>
       )}
-      <div className="scoreProfileRow">
+      <div className="scoreSettingRow">
         <label>
-          Add unwanted skill
+          不要スキルを追加
           <select
             value={selectedSkillKey}
             onChange={(event) =>
               onSelectedSkillChange(event.currentTarget.value)
             }
           >
-            <option value="">Select skill</option>
+            <option value="">スキルを選択</option>
             {options.map((option) => (
               <option key={option.key} value={option.key}>
                 {option.label}
@@ -1092,7 +1038,7 @@ function UnwantedSkillEditor({
           </select>
         </label>
         <button type="button" onClick={onAddSkill}>
-          Add
+          追加
         </button>
       </div>
       {errorMessage !== null && <p className="errorText">{errorMessage}</p>}
@@ -1117,15 +1063,15 @@ function SkillPriorityEditor({
   onSelectedSkillChange: (skillKey: string) => void;
   options: SkillCatalogOption[];
   selectedSkillKey: string;
-  skillPriority: ScoreProfile["skillPriority"];
+  skillPriority: CustomScoreSettings["skillPriority"];
 }) {
   const sortedSkillPriority = getSortedSkillPriorityEntries(skillPriority);
 
   return (
-    <section className="skillPriorityEditor" aria-label="Skill priority">
-      <h3>Skill Priority</h3>
+    <section className="skillPriorityEditor" aria-label="スキル優先度">
+      <h3>スキル優先度</h3>
       {sortedSkillPriority.length === 0 ? (
-        <p className="mutedText">No priority skills selected.</p>
+        <p className="mutedText">優先スキルが選択されていません。</p>
       ) : (
         <ol className="skillPriorityList">
           {sortedSkillPriority.map((entry, index) => (
@@ -1152,23 +1098,23 @@ function SkillPriorityEditor({
                   type="button"
                   onClick={() => onRemoveSkill(entry.skillKey)}
                 >
-                  Remove
+                  削除
                 </button>
               </div>
             </li>
           ))}
         </ol>
       )}
-      <div className="scoreProfileRow">
+      <div className="scoreSettingRow">
         <label>
-          Add priority skill
+          優先スキルを追加
           <select
             value={selectedSkillKey}
             onChange={(event) =>
               onSelectedSkillChange(event.currentTarget.value)
             }
           >
-            <option value="">Select skill</option>
+            <option value="">スキルを選択</option>
             {options.map((option) => (
               <option key={option.key} value={option.key}>
                 {option.label}
@@ -1177,7 +1123,7 @@ function SkillPriorityEditor({
           </select>
         </label>
         <button type="button" onClick={onAddSkill}>
-          Add
+          追加
         </button>
       </div>
       {errorMessage !== null && <p className="errorText">{errorMessage}</p>}
@@ -1327,7 +1273,7 @@ function ArtifactControls({
     <section className="tableControls" aria-label="Artifact filters">
       <div className="filterGrid">
         <label>
-          Search
+          検索
           <input
             type="search"
             value={filters.searchText}
@@ -1337,12 +1283,12 @@ function ArtifactControls({
                 searchText: event.currentTarget.value,
               })
             }
-            placeholder="Name, skill, equipped character"
+            placeholder="名前、スキル、装備キャラ"
           />
         </label>
 
         <label>
-          Attribute
+          属性
           <select
             value={filters.attribute}
             onChange={(event) =>
@@ -1352,7 +1298,7 @@ function ArtifactControls({
               })
             }
           >
-            <option value="all">All</option>
+            <option value="all">すべて</option>
             {attributeOptions.map((attribute) => (
               <option key={attribute} value={attribute}>
                 {attribute}
@@ -1362,7 +1308,7 @@ function ArtifactControls({
         </label>
 
         <label>
-          Kind
+          武器種
           <select
             value={filters.kind}
             onChange={(event) =>
@@ -1372,17 +1318,17 @@ function ArtifactControls({
               })
             }
           >
-            <option value="all">All</option>
+            <option value="all">すべて</option>
             {kindOptions.map((kind) => (
               <option key={kind} value={kind}>
-                {kind}
+                {formatKindLabel(kind)}
               </option>
             ))}
           </select>
         </label>
 
         <label>
-          Locked
+          お気に入り(ゲーム内)
           <select
             value={filters.locked}
             onChange={(event) =>
@@ -1392,14 +1338,14 @@ function ArtifactControls({
               })
             }
           >
-            <option value="all">All</option>
-            <option value="locked">Locked</option>
-            <option value="unlocked">Unlocked</option>
+            <option value="all">すべて</option>
+            <option value="locked">お気に入り</option>
+            <option value="unlocked">お気に入り以外</option>
           </select>
         </label>
 
         <label>
-          Equipped
+          装備状態(ゲーム内)
           <select
             value={filters.equipped}
             onChange={(event) =>
@@ -1409,14 +1355,14 @@ function ArtifactControls({
               })
             }
           >
-            <option value="all">All</option>
-            <option value="equipped">Equipped</option>
-            <option value="unequipped">Unequipped</option>
+            <option value="all">すべて</option>
+            <option value="equipped">装備中</option>
+            <option value="unequipped">未装備</option>
           </select>
         </label>
 
         <label>
-          Rating
+          評価
           <select
             value={filters.rating}
             onChange={(event) =>
@@ -1426,8 +1372,8 @@ function ArtifactControls({
               })
             }
           >
-            <option value="all">All</option>
-            <option value="unrated">Unrated</option>
+            <option value="all">すべて</option>
+            <option value="unrated">未評価</option>
             <option value="1">1</option>
             <option value="2">2</option>
             <option value="3">3</option>
@@ -1437,7 +1383,7 @@ function ArtifactControls({
         </label>
 
         <label>
-          Lifecycle
+          所持状態
           <select
             value={filters.lifecycle}
             onChange={(event) =>
@@ -1447,14 +1393,14 @@ function ArtifactControls({
               })
             }
           >
-            <option value="all">All</option>
-            <option value="active">Active</option>
-            <option value="possiblyDeleted">Possibly deleted</option>
+            <option value="all">すべて</option>
+            <option value="active">所持中</option>
+            <option value="possiblyDeleted">解体済み?</option>
           </select>
         </label>
 
         <label>
-          Sort
+          並び替え
           <select
             value={`${sort.key}:${sort.direction}`}
             onChange={(event) => {
@@ -1465,22 +1411,22 @@ function ArtifactControls({
               });
             }}
           >
-            <option value="totalScore:desc">Total score descending</option>
-            <option value="totalScore:asc">Total score ascending</option>
-            <option value="ownedId:desc">ownedId descending</option>
-            <option value="ownedId:asc">ownedId ascending</option>
-            <option value="name:asc">Name ascending</option>
-            <option value="name:desc">Name descending</option>
-            <option value="rating:asc">Rating ascending</option>
-            <option value="rating:desc">Rating descending</option>
-            <option value="customScore:desc">Custom score descending</option>
-            <option value="customScore:asc">Custom score ascending</option>
+            <option value="totalScore:desc">ゲーム内スコア降順</option>
+            <option value="totalScore:asc">ゲーム内スコア昇順</option>
+            <option value="ownedId:desc">最近入手した順</option>
+            <option value="ownedId:asc">古い順</option>
+            <option value="rating:asc">評価昇順</option>
+            <option value="rating:desc">評価降順</option>
+            <option value="customScore:desc">カスタムスコア降順</option>
+            <option value="customScore:asc">カスタムスコア昇順</option>
+            <option value="attributeOrder:asc">属性順(火→闇)</option>
+            <option value="kindOrder:asc">武器種順(剣→刀)</option>
           </select>
         </label>
       </div>
 
       <div className="resultCount">
-        Showing {filteredCount} / {artifactCount}
+        表示中 {filteredCount} / {artifactCount}
       </div>
     </section>
   );
@@ -1505,20 +1451,20 @@ function ArtifactTable({
       <table>
         <thead>
           <tr>
-            <th>ownedId</th>
-            <th>Name</th>
-            <th>Attribute</th>
-            <th>Kind</th>
-            <th>Level</th>
-            <th>Total score</th>
-            <th>Custom Score</th>
-            <th>Rating</th>
-            <th>Memo</th>
-            <th>Last seen</th>
-            <th>Possibly deleted</th>
-            <th>Locked</th>
-            <th>Equipped</th>
-            <th>Skills</th>
+            <th>所持ID</th>
+            <th>アーティファクト名</th>
+            <th>属性</th>
+            <th>武器種</th>
+            <th>レベル</th>
+            <th>ゲーム内スコア</th>
+            <th>カスタムスコア</th>
+            <th>評価</th>
+            <th>メモ</th>
+            <th>最終確認日</th>
+            <th>解体済み?</th>
+            <th>お気に入り</th>
+            <th>装備キャラ</th>
+            <th>スキル</th>
           </tr>
         </thead>
         <tbody>
@@ -1530,7 +1476,7 @@ function ArtifactTable({
                 <td>{artifact.ownedId}</td>
                 <td>{artifact.name}</td>
                 <td>{artifact.attribute.label}</td>
-                <td>{artifact.kind.label}</td>
+                <td>{formatKindLabel(artifact.kind.label)}</td>
                 <td>
                   {artifact.level}/{artifact.maxLevel}
                 </td>
@@ -1572,8 +1518,8 @@ function ArtifactTable({
                   />
                 </td>
                 <td>{row.presence?.lastSeenAt ?? "-"}</td>
-                <td>{row.presence?.isPossiblyDeleted ? "Yes" : "No"}</td>
-                <td>{artifact.isLocked ? "Yes" : "No"}</td>
+                <td>{formatBooleanLabel(row.presence?.isPossiblyDeleted)}</td>
+                <td>{formatBooleanLabel(artifact.isLocked)}</td>
                 <td>{artifact.equippedCharacter?.name ?? "-"}</td>
                 <td>
                   <ul className="skillList">
@@ -1597,7 +1543,7 @@ function CustomScoreCell({ score }: { score: ScoreResult }) {
   return (
     <div className="customScoreCell" title={formatScoreReasonTitle(score)}>
       <strong>{score.total}</strong>
-      <span>{score.selectedRoute}</span>
+      <span>{formatScoreRouteLabel(score.selectedRoute)}</span>
       <small>{formatShortScoreReasons(score.reasons)}</small>
     </div>
   );
@@ -1727,8 +1673,24 @@ function compareArtifacts(
     );
   }
 
+  if (sort.key === "attributeOrder") {
+    return (
+      compareOrderedValues(
+        getAttributeOrder(left.artifact.attribute.label),
+        getAttributeOrder(right.artifact.attribute.label),
+        left.artifact.ownedId,
+        right.artifact.ownedId,
+      ) * directionMultiplier
+    );
+  }
+
   return (
-    left.artifact.name.localeCompare(right.artifact.name) * directionMultiplier
+    compareOrderedValues(
+      getKindOrder(left.artifact.kind.label),
+      getKindOrder(right.artifact.kind.label),
+      left.artifact.ownedId,
+      right.artifact.ownedId,
+    ) * directionMultiplier
   );
 }
 
@@ -1736,7 +1698,7 @@ function buildArtifactScoreViewModel(args: {
   artifact: Artifact;
   review: ArtifactUserReview | null;
   presence: ArtifactPresence | null;
-  scoreProfile: ScoreProfile;
+  scoreSettings: CustomScoreSettings;
   unwantedSkillConfig: UnwantedSkillConfig;
 }): ReviewedArtifactRow {
   return {
@@ -1745,38 +1707,10 @@ function buildArtifactScoreViewModel(args: {
     presence: args.presence,
     customScore: evaluateCustomScore({
       artifact: args.artifact,
-      profile: args.scoreProfile,
+      settings: args.scoreSettings,
       unwantedSkillConfig: args.unwantedSkillConfig,
     }),
   };
-}
-
-function getActiveScoreProfile(
-  scoreProfiles: ScoreProfile[],
-  selectedScoreProfileId: string | null,
-): ScoreProfile {
-  const selectedProfile = scoreProfiles.find(
-    (profile) => profile.id === selectedScoreProfileId,
-  );
-
-  return selectedProfile ?? scoreProfiles[0] ?? DEFAULT_SCORE_PROFILE;
-}
-
-function replaceScoreProfile(
-  profiles: ScoreProfile[],
-  profile: ScoreProfile,
-): ScoreProfile[] {
-  const replacedProfiles = profiles.map((currentProfile) =>
-    currentProfile.id === profile.id ? profile : currentProfile,
-  );
-
-  if (
-    replacedProfiles.some((currentProfile) => currentProfile.id === profile.id)
-  ) {
-    return replacedProfiles;
-  }
-
-  return [...replacedProfiles, profile];
 }
 
 function getDashboardTabClassName(isActive: boolean): string {
@@ -1784,14 +1718,14 @@ function getDashboardTabClassName(isActive: boolean): string {
 }
 
 function getSortedSkillPriorityEntries(
-  skillPriority: ScoreProfile["skillPriority"],
-): ScoreProfile["skillPriority"] {
+  skillPriority: CustomScoreSettings["skillPriority"],
+): CustomScoreSettings["skillPriority"] {
   return [...skillPriority].sort((left, right) => left.rank - right.rank);
 }
 
 function reassignSkillPriorityRanks(
-  skillPriority: ScoreProfile["skillPriority"],
-): ScoreProfile["skillPriority"] {
+  skillPriority: CustomScoreSettings["skillPriority"],
+): CustomScoreSettings["skillPriority"] {
   return skillPriority.map((entry, index) => ({
     ...entry,
     rank: index + 1,
@@ -1820,7 +1754,7 @@ function formatShortScoreReasons(reasons: ScoreReason[]): string {
 
 function formatScoreReasonTitle(score: ScoreResult): string {
   if (score.reasons.length === 0) {
-    return `Route: ${score.selectedRoute}`;
+    return `ルート: ${formatScoreRouteLabel(score.selectedRoute)}`;
   }
 
   return score.reasons
@@ -1851,13 +1785,61 @@ function indexReviewsByOwnedId(
 function getAttributeOptions(artifacts: Artifact[]): string[] {
   return Array.from(
     new Set(artifacts.map((artifact) => artifact.attribute.label)),
-  ).sort((left, right) => left.localeCompare(right));
+  ).sort((left, right) =>
+    compareOrderedValues(
+      getAttributeOrder(left),
+      getAttributeOrder(right),
+      0,
+      0,
+    ),
+  );
 }
 
 function getKindOptions(artifacts: Artifact[]): string[] {
   return Array.from(
     new Set(artifacts.map((artifact) => artifact.kind.label)),
-  ).sort((left, right) => left.localeCompare(right));
+  ).sort((left, right) =>
+    compareOrderedValues(getKindOrder(left), getKindOrder(right), 0, 0),
+  );
+}
+
+function getAttributeOrder(attributeLabel: string): number {
+  const index = ATTRIBUTE_ORDER.indexOf(
+    attributeLabel as (typeof ATTRIBUTE_ORDER)[number],
+  );
+
+  return index >= 0 ? index : ATTRIBUTE_ORDER.length;
+}
+
+function getKindOrder(kindLabel: string): number {
+  const index = KIND_ORDER.indexOf(kindLabel as (typeof KIND_ORDER)[number]);
+
+  return index >= 0 ? index : KIND_ORDER.length;
+}
+
+function compareOrderedValues(
+  leftOrder: number,
+  rightOrder: number,
+  leftFallback: number,
+  rightFallback: number,
+): number {
+  if (leftOrder !== rightOrder) {
+    return leftOrder - rightOrder;
+  }
+
+  return rightFallback - leftFallback;
+}
+
+function formatKindLabel(kind: string): string {
+  return KIND_LABELS[kind] ?? kind;
+}
+
+function formatBooleanLabel(value: boolean | undefined): string {
+  return value ? "はい" : "いいえ";
+}
+
+function formatScoreRouteLabel(route: ScoreResult["selectedRoute"]): string {
+  return route === "ideal" ? "理想" : "優先度";
 }
 
 function downloadCsvFile(csv: string, fileName: string) {

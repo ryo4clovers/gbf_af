@@ -1,51 +1,118 @@
+:root {
+  color-scheme: light;
+  --color-bg: #dcecf4;
+  --color-surface: rgba(255, 252, 241, 0.94);
+  --color-surface-raised: rgba(250, 245, 226, 0.96);
+  --color-surface-muted: rgba(237, 232, 211, 0.78);
+  --color-border: rgba(132, 103, 53, 0.28);
+  --color-border-strong: rgba(151, 111, 42, 0.58);
+  --color-text: #24364a;
+  --color-text-muted: #687586;
+  --color-accent: #a9782d;
+  --color-accent-strong: #7a531d;
+  --color-accent-secondary: #406f9c;
+  --color-danger: #a43d46;
+  --shadow-panel:
+    0 18px 46px rgba(38, 67, 91, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+* {
+  scrollbar-color: rgba(151, 111, 42, 0.5) rgba(234, 226, 200, 0.8);
+}
+
 body {
   margin: 0;
-  color: #1f2933;
+  color: var(--color-text);
   font-family:
+    "Yu Mincho",
+    "Hiragino Mincho ProN",
+    Georgia,
     system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
     sans-serif;
-  background: #f7f8fa;
+  background-color: var(--color-bg);
+  background-image:
+    radial-gradient(ellipse at 8% 5%, rgba(255, 255, 255, 0.96), transparent 24rem),
+    radial-gradient(ellipse at 92% 18%, rgba(255, 255, 255, 0.7), transparent 28rem),
+    linear-gradient(160deg, rgba(92, 159, 201, 0.18), transparent 48%),
+    linear-gradient(180deg, #b9dbea 0%, #e6f1f3 48%, #c9e1e9 100%);
+  background-size:
+    auto,
+    auto,
+    auto,
+    auto;
+  background-attachment: fixed;
 }
 
 button {
-  border: 1px solid #c7ced8;
-  border-radius: 6px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 4px;
   padding: 8px 12px;
-  color: #1f2933;
+  color: var(--color-text);
   font: inherit;
-  background: #ffffff;
+  background: linear-gradient(180deg, #fffdf5, #e8dfc8);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 2px 5px rgba(84, 63, 31, 0.1);
   cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
 }
 
 button:hover {
-  background: #eef2f6;
+  border-color: var(--color-accent);
+  color: var(--color-accent-strong);
+  background: linear-gradient(180deg, #ffffff, #f0e5ca);
+  box-shadow:
+    0 4px 12px rgba(112, 81, 32, 0.18),
+    inset 0 1px 0 #ffffff;
+  transform: translateY(-1px);
 }
 
 button:disabled {
-  color: #7b8794;
-  background: #eef2f6;
+  border-color: rgba(104, 117, 134, 0.2);
+  color: #9a9a90;
+  background: rgba(226, 224, 213, 0.8);
+  box-shadow: none;
   cursor: default;
+  transform: none;
 }
 
 input,
 select {
   box-sizing: border-box;
   width: 100%;
-  border: 1px solid #c7ced8;
-  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
   padding: 7px 8px;
-  color: #1f2933;
+  color: var(--color-text);
   font: inherit;
-  background: #ffffff;
+  background: rgba(255, 254, 248, 0.92);
+  outline: none;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+input:focus,
+select:focus,
+button:focus-visible {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px rgba(169, 120, 45, 0.13);
+}
+
+select option {
+  color: var(--color-text);
+  background: #fffdf6;
 }
 
 .dashboard {
   box-sizing: border-box;
   min-height: 100vh;
-  padding: 24px;
+  padding: 28px;
 }
 
 .topBar {
@@ -55,14 +122,43 @@ select {
   gap: 24px;
 }
 
+.topBarActions {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+}
+
+.themeSelector {
+  display: grid;
+  gap: 4px;
+  min-width: 116px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .topBar h1 {
   margin: 0;
-  font-size: 24px;
+  color: #244d70;
+  font-size: clamp(24px, 3vw, 34px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.topBar h1::before {
+  margin-right: 10px;
+  color: var(--color-accent);
+  content: "◆";
+  font-size: 0.72em;
 }
 
 .topBar p {
-  margin: 4px 0 0;
-  color: #52616f;
+  margin: 7px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  letter-spacing: 0.04em;
 }
 
 .scanResultSummary {
@@ -83,25 +179,44 @@ select {
 
 .statusGrid div,
 .panel {
-  border: 1px solid #d8dee8;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
-  background: #ffffff;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(10px);
 }
 
 .statusGrid div {
+  position: relative;
+  overflow: hidden;
   padding: 14px;
+}
+
+.statusGrid div::before,
+.summaryCard::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 54px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--color-accent), transparent);
+  content: "";
 }
 
 .statusGrid span {
   display: block;
-  color: #697586;
-  font-size: 13px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .statusGrid strong {
   display: block;
   margin-top: 6px;
-  font-size: 18px;
+  color: #365f82;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
 }
 
 .workspace {
@@ -110,25 +225,51 @@ select {
 }
 
 .panel {
+  position: relative;
   min-height: 180px;
-  padding: 16px;
+  padding: 20px;
+}
+
+.panel::before,
+.panel::after {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-color: var(--color-border-strong);
+  content: "";
+  pointer-events: none;
+}
+
+.panel::before {
+  top: 8px;
+  left: 8px;
+  border-top: 2px solid;
+  border-left: 2px solid;
+}
+
+.panel::after {
+  right: 8px;
+  bottom: 8px;
+  border-right: 2px solid;
+  border-bottom: 2px solid;
 }
 
 .panel h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 17px;
+  letter-spacing: 0.04em;
 }
 
 .panel p {
   margin: 8px 0 0;
-  color: #52616f;
+  color: var(--color-text-muted);
 }
 
 .dashboardTabs {
   display: flex;
-  gap: 4px;
-  margin-top: 16px;
-  border-bottom: 1px solid #d8dee8;
+  gap: 8px;
+  margin-top: 20px;
+  border-bottom: 1px solid var(--color-border);
   overflow-x: auto;
 }
 
@@ -137,18 +278,23 @@ select {
   border: 0;
   border-radius: 0;
   padding: 10px 16px;
-  color: #52616f;
+  color: var(--color-text-muted);
   font-weight: 600;
+  letter-spacing: 0.04em;
   background: transparent;
   white-space: nowrap;
 }
 
 .dashboardTab:hover {
-  background: #eef2f6;
+  color: var(--color-text);
+  background: rgba(169, 120, 45, 0.06);
+  box-shadow: none;
+  transform: none;
 }
 
 .dashboardTab.active {
-  color: #3366cc;
+  color: var(--color-accent);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .dashboardTab.active::after {
@@ -157,7 +303,7 @@ select {
   bottom: -1px;
   left: 0;
   height: 2px;
-  background: #3366cc;
+  background: linear-gradient(90deg, transparent, var(--color-accent), transparent);
   content: "";
 }
 
@@ -183,74 +329,56 @@ select {
 
 .statisticsSection {
   margin-top: 16px;
-  border-top: 1px solid #e4e8ef;
+  border-top: 1px solid var(--color-border);
   padding-top: 16px;
 }
 
-.customScoreProfileSummary {
-  display: grid;
-  gap: 10px;
-  margin-top: 16px;
-  border-top: 1px solid #e4e8ef;
-  padding-top: 16px;
-  color: #52616f;
-  font-size: 13px;
-}
-
-.scoreProfileRow {
+.scoreSettingRow {
   display: flex;
   align-items: end;
   gap: 8px;
 }
 
-.customScoreProfileSummary label {
-  display: grid;
-  gap: 6px;
-  max-width: 280px;
-  min-width: 220px;
-}
-
-.customScoreProfileSummary select,
-.customScoreProfileSummary input {
-  color: #1f2933;
-}
-
-.customScoreProfileSummary button {
-  white-space: nowrap;
-}
-
-.customScoreProfileSummary p {
-  margin: 0;
-  color: #b42318;
-}
-
 .idealSkillEditor,
+.idealMatchScoreEditor,
 .skillPriorityEditor,
 .unwantedSkillEditor {
   display: grid;
   gap: 10px;
   margin-top: 12px;
-  border-top: 1px solid #eef2f6;
+  border-top: 1px solid var(--color-border);
   padding-top: 12px;
-  color: #52616f;
+  color: var(--color-text-muted);
   font-size: 13px;
 }
 
 .idealSkillEditor h3,
+.idealMatchScoreEditor h3,
 .skillPriorityEditor h3,
 .unwantedSkillEditor h3 {
   margin: 0;
-  color: #1f2933;
+  color: var(--color-text);
   font-size: 14px;
 }
 
 .idealSkillEditor label,
+.idealMatchScoreEditor label,
 .skillPriorityEditor label,
 .unwantedSkillEditor label {
   display: grid;
   gap: 6px;
   max-width: 280px;
   min-width: 220px;
+}
+
+.idealMatchScoreGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 180px));
+  gap: 10px;
+}
+
+.idealMatchScoreEditor > button {
+  justify-self: start;
 }
 
 .scoreSkillChips {
@@ -260,21 +388,21 @@ select {
 }
 
 .scoreSkillChip {
-  border-color: #d8dee8;
+  border-color: rgba(64, 111, 156, 0.4);
   padding: 5px 8px;
-  color: #1f2933;
+  color: #315f87;
   font-size: 12px;
-  background: #fafbfc;
+  background: rgba(64, 111, 156, 0.08);
 }
 
 .mutedText {
   margin: 0;
-  color: #697586;
+  color: var(--color-text-muted);
 }
 
 .errorText {
   margin: 0;
-  color: #b42318;
+  color: var(--color-danger);
 }
 
 .skillPriorityList {
@@ -290,10 +418,10 @@ select {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  border: 1px solid #e4e8ef;
-  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
   padding: 8px;
-  background: #fafbfc;
+  background: var(--color-surface-muted);
 }
 
 .skillPriorityActions {
@@ -316,22 +444,26 @@ select {
 }
 
 .summaryCard {
-  border: 1px solid #e4e8ef;
-  border-radius: 6px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
   padding: 10px;
-  background: #fafbfc;
+  background: linear-gradient(135deg, rgba(255, 253, 244, 0.95), rgba(235, 226, 202, 0.92));
 }
 
 .summaryCard span {
   display: block;
-  color: #697586;
+  color: var(--color-text-muted);
   font-size: 12px;
 }
 
 .summaryCard strong {
   display: block;
   margin-top: 4px;
+  color: #365f82;
   font-size: 18px;
+  font-variant-numeric: tabular-nums;
 }
 
 .statisticsTables {
@@ -362,7 +494,7 @@ select {
 
 .tableControls {
   margin-top: 16px;
-  border-top: 1px solid #e4e8ef;
+  border-top: 1px solid var(--color-border);
   padding-top: 16px;
 }
 
@@ -375,19 +507,24 @@ select {
 .filterGrid label {
   display: grid;
   gap: 6px;
-  color: #52616f;
+  color: var(--color-text-muted);
   font-size: 12px;
+  letter-spacing: 0.025em;
 }
 
 .resultCount {
   margin-top: 10px;
-  color: #52616f;
+  color: var(--color-accent-strong);
+  font-weight: 700;
   font-size: 13px;
 }
 
 .tableScroller {
   margin-top: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
   overflow-x: auto;
+  background: rgba(255, 254, 248, 0.76);
 }
 
 table {
@@ -399,16 +536,37 @@ table {
 
 th,
 td {
-  border-bottom: 1px solid #e4e8ef;
-  padding: 8px;
+  border-bottom: 1px solid rgba(132, 103, 53, 0.16);
+  padding: 10px 8px;
   text-align: left;
   vertical-align: top;
 }
 
 th {
-  color: #52616f;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: #f9f3df;
+  font-size: 11px;
   font-weight: 600;
-  background: #f7f8fa;
+  letter-spacing: 0.035em;
+  background: linear-gradient(180deg, #496f8e, #335873);
+  box-shadow: 0 1px 0 var(--color-border);
+}
+
+tbody tr {
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+tbody tr:nth-child(even) {
+  background: rgba(169, 120, 45, 0.035);
+}
+
+tbody tr:hover {
+  background: rgba(85, 145, 181, 0.1);
+  box-shadow: inset 3px 0 0 var(--color-accent);
 }
 
 .skillList {
@@ -423,12 +581,14 @@ th {
 }
 
 .customScoreCell strong {
+  color: var(--color-accent-secondary);
   font-size: 16px;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .customScoreCell span,
 .customScoreCell small {
-  color: #52616f;
+  color: var(--color-text-muted);
 }
 
 .customScoreCell span {
@@ -455,9 +615,187 @@ th {
   min-width: 180px;
 }
 
+:root[data-theme="cyber"] {
+  color-scheme: dark;
+  --color-bg: #050914;
+  --color-surface: rgba(10, 20, 37, 0.92);
+  --color-surface-raised: rgba(14, 29, 51, 0.94);
+  --color-surface-muted: rgba(18, 35, 58, 0.78);
+  --color-border: rgba(73, 214, 255, 0.22);
+  --color-border-strong: rgba(73, 214, 255, 0.48);
+  --color-text: #e4f7ff;
+  --color-text-muted: #8eafc2;
+  --color-accent: #49d6ff;
+  --color-accent-strong: #00b8f5;
+  --color-accent-secondary: #a77bff;
+  --color-danger: #ff6b89;
+  --shadow-panel:
+    0 18px 48px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+
+:root[data-theme="cyber"] * {
+  scrollbar-color: rgba(73, 214, 255, 0.4) rgba(5, 9, 20, 0.8);
+}
+
+:root[data-theme="cyber"] body {
+  font-family:
+    Inter,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  background-color: var(--color-bg);
+  background-image:
+    linear-gradient(rgba(73, 214, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(73, 214, 255, 0.035) 1px, transparent 1px),
+    radial-gradient(circle at 12% 0%, rgba(0, 184, 245, 0.16), transparent 32rem),
+    radial-gradient(circle at 88% 15%, rgba(167, 123, 255, 0.1), transparent 30rem);
+  background-size:
+    32px 32px,
+    32px 32px,
+    auto,
+    auto;
+}
+
+:root[data-theme="cyber"] button {
+  background: linear-gradient(180deg, rgba(22, 48, 72, 0.95), rgba(10, 25, 43, 0.95));
+  box-shadow: inset 0 0 12px rgba(73, 214, 255, 0.04);
+}
+
+:root[data-theme="cyber"] button:hover {
+  color: #ffffff;
+  background: linear-gradient(180deg, rgba(26, 62, 88, 0.98), rgba(12, 33, 54, 0.98));
+  box-shadow:
+    0 0 16px rgba(73, 214, 255, 0.14),
+    inset 0 0 14px rgba(73, 214, 255, 0.08);
+}
+
+:root[data-theme="cyber"] button:disabled {
+  border-color: rgba(142, 175, 194, 0.15);
+  color: #587184;
+  background: rgba(17, 30, 46, 0.7);
+  box-shadow: none;
+}
+
+:root[data-theme="cyber"] input,
+:root[data-theme="cyber"] select {
+  background: rgba(4, 13, 25, 0.9);
+}
+
+:root[data-theme="cyber"] input:focus,
+:root[data-theme="cyber"] select:focus,
+:root[data-theme="cyber"] button:focus-visible {
+  box-shadow: 0 0 0 2px rgba(73, 214, 255, 0.12);
+}
+
+:root[data-theme="cyber"] select option {
+  background: #0a1425;
+}
+
+:root[data-theme="cyber"] .topBar h1 {
+  color: #f1fbff;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 24px rgba(73, 214, 255, 0.24);
+}
+
+:root[data-theme="cyber"] .topBar h1::before {
+  content: "//";
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+
+:root[data-theme="cyber"] .topBar p,
+:root[data-theme="cyber"] .dashboardTab,
+:root[data-theme="cyber"] .filterGrid label,
+:root[data-theme="cyber"] .resultCount,
+:root[data-theme="cyber"] .themeSelector,
+:root[data-theme="cyber"] th {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+
+:root[data-theme="cyber"] .statusGrid div::before,
+:root[data-theme="cyber"] .summaryCard::before {
+  width: 42px;
+  height: 1px;
+  background: var(--color-accent);
+  box-shadow: 0 0 10px var(--color-accent);
+}
+
+:root[data-theme="cyber"] .statusGrid strong,
+:root[data-theme="cyber"] .summaryCard strong {
+  color: var(--color-accent);
+}
+
+:root[data-theme="cyber"] .panel {
+  backdrop-filter: blur(14px);
+}
+
+:root[data-theme="cyber"] .dashboardTab:hover {
+  background: rgba(73, 214, 255, 0.06);
+}
+
+:root[data-theme="cyber"] .dashboardTab.active {
+  text-shadow: 0 0 12px rgba(73, 214, 255, 0.4);
+}
+
+:root[data-theme="cyber"] .dashboardTab.active::after {
+  background: var(--color-accent);
+  box-shadow: 0 0 12px var(--color-accent);
+}
+
+:root[data-theme="cyber"] .scoreSkillChip {
+  border-color: rgba(167, 123, 255, 0.4);
+  color: #dfd2ff;
+  background: rgba(167, 123, 255, 0.08);
+}
+
+:root[data-theme="cyber"] .summaryCard {
+  background: linear-gradient(135deg, rgba(17, 37, 60, 0.92), rgba(7, 18, 34, 0.92));
+}
+
+:root[data-theme="cyber"] .resultCount {
+  color: var(--color-accent);
+}
+
+:root[data-theme="cyber"] .tableScroller {
+  background: rgba(4, 12, 23, 0.7);
+}
+
+:root[data-theme="cyber"] th,
+:root[data-theme="cyber"] td {
+  border-bottom-color: rgba(73, 214, 255, 0.12);
+}
+
+:root[data-theme="cyber"] th {
+  color: var(--color-accent);
+  background: #0d2033;
+}
+
+:root[data-theme="cyber"] tbody tr:nth-child(even) {
+  background: rgba(73, 214, 255, 0.018);
+}
+
+:root[data-theme="cyber"] tbody tr:hover {
+  background: rgba(73, 214, 255, 0.075);
+}
+
+:root[data-theme="cyber"] .customScoreCell strong {
+  color: var(--color-accent-secondary);
+  text-shadow: 0 0 10px rgba(167, 123, 255, 0.25);
+}
+
 @media (max-width: 800px) {
+  .dashboard {
+    padding: 16px;
+  }
+
   .topBar {
     display: block;
+  }
+
+  .topBarActions {
+    margin-top: 14px;
   }
 
   .workspace,
@@ -478,8 +816,12 @@ th {
     grid-template-columns: 1fr;
   }
 
-  .scoreProfileRow {
+  .scoreSettingRow {
     display: grid;
     align-items: stretch;
+  }
+
+  .idealMatchScoreGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

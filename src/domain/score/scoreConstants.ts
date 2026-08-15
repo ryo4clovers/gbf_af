@@ -1,11 +1,3 @@
-export const IDEAL_MATCH_SCORE = {
-  0: 0,
-  1: 20,
-  2: 45,
-  3: 75,
-  4: 110,
-} as const;
-
 export const TABLE_RANK_MULTIPLIER = {
   a: 1.0,
   b: 1.05,

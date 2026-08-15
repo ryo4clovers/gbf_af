@@ -171,7 +171,7 @@ Dashboard はローカル保存済み artifact の管理画面として動作す
 - statistics summary を表示できる
 - rating / memo を編集できる
 - lifecycle filtering ができる
-- custom score profile editor を将来的に提供できる構成にする
+- 単一の custom score settings editor を提供できる構成にする
 
 ### R-009: Filtering
 
@@ -463,7 +463,7 @@ Route: priority
 
 * artifact data は IndexedDB に保存する
 * rating / memo は IndexedDB に保存する
-* score profile も将来的に IndexedDB に保存する
+* custom score settings は IndexedDB に保存する
 * CSV はローカルで生成する
 * 外部サーバーへ同期しない
 
@@ -560,7 +560,7 @@ Manifest V3 の service worker lifecycle を考慮する。
   * general use
 * custom score import / export
 * advanced formula editor
-* score profile comparison
+* custom score settings import / export
 * character-specific evaluation
 * attribute-specific evaluation
 * more detailed skill normalization
