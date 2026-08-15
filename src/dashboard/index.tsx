@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { convertArtifactRowsToCsv } from "../csv/artifactCsv";
 import type { Artifact } from "../domain/artifact";
@@ -10,17 +10,24 @@ import type { ArtifactPresence } from "../domain/scanSession";
 import {
   type CustomScoreSettings,
   DEFAULT_CUSTOM_SCORE_SETTINGS,
-  DEFAULT_UNWANTED_SKILL_CONFIG,
   type IdealMatchScores,
-  type UnwantedSkillConfig,
+  type SkillScores,
   validateIdealMatchScores,
+  validateSkillScores,
 } from "../domain/score/customScoreSettings";
 import { evaluateCustomScore } from "../domain/score/evaluateCustomScore";
-import type { ScoreReason, ScoreResult } from "../domain/score/scoreResult";
 import {
-  getSkillCatalogOptions,
-  type SkillCatalogOption,
-} from "../domain/skill/skillCatalog";
+  ARTIFACT_ATTRIBUTE_OPTIONS,
+  ARTIFACT_KIND_OPTIONS,
+  createEmptyIdealSkillConfiguration,
+  IDEAL_FIRST_SECOND_SLOT_OPTIONS,
+  IDEAL_FOURTH_SLOT_OPTIONS,
+  IDEAL_THIRD_SLOT_OPTIONS,
+  type IdealSkillConfiguration,
+  type IdealSkillOption,
+  validateIdealSkillConfigurations,
+} from "../domain/score/idealSkillConfiguration";
+import type { ScoreReason, ScoreResult } from "../domain/score/scoreResult";
 import { sendRuntimeMessage } from "../shared/chromeMessages";
 import { useAppStore } from "../state/appState";
 import {
@@ -76,7 +83,6 @@ type ReviewedArtifactRow = {
   customScore: ScoreResult;
 };
 
-const skillCatalogOptions = getSkillCatalogOptions();
 const DASHBOARD_THEME_STORAGE_KEY = "gbf-af-dashboard-theme";
 const ATTRIBUTE_ORDER = ["火", "水", "土", "風", "光", "闇"] as const;
 const KIND_ORDER = [
@@ -126,22 +132,14 @@ function Dashboard() {
   >({});
   const [customScoreSettings, setCustomScoreSettings] =
     useState<CustomScoreSettings>(DEFAULT_CUSTOM_SCORE_SETTINGS);
-  const [unwantedSkillConfig, setUnwantedSkillConfig] =
-    useState<UnwantedSkillConfig>(DEFAULT_UNWANTED_SKILL_CONFIG);
   const [scoreSettingsError, setScoreSettingsError] = useState<string | null>(
     null,
   );
-  const [selectedIdealSkillKey, setSelectedIdealSkillKey] = useState("");
   const [idealSkillError, setIdealSkillError] = useState<string | null>(null);
   const [idealMatchScoreError, setIdealMatchScoreError] = useState<
     string | null
   >(null);
-  const [selectedPrioritySkillKey, setSelectedPrioritySkillKey] = useState("");
   const [prioritySkillError, setPrioritySkillError] = useState<string | null>(
-    null,
-  );
-  const [selectedUnwantedSkillKey, setSelectedUnwantedSkillKey] = useState("");
-  const [unwantedSkillError, setUnwantedSkillError] = useState<string | null>(
     null,
   );
   const [filters, setFilters] = useState<ArtifactFilters>(initialFilters);
@@ -159,7 +157,6 @@ function Dashboard() {
       review: reviewsByOwnedId[artifact.ownedId] ?? null,
       presence: presenceByOwnedId[artifact.ownedId] ?? null,
       scoreSettings: customScoreSettings,
-      unwantedSkillConfig,
     }),
   );
   const statistics = calculateArtifactStatistics({
@@ -189,13 +186,11 @@ function Dashboard() {
       reviewResponse,
       presenceResponse,
       customScoreSettingsResponse,
-      unwantedSkillConfigResponse,
     ] = await Promise.all([
       sendRuntimeMessage({ type: "GET_STORED_ARTIFACTS" }),
       sendRuntimeMessage({ type: "GET_ARTIFACT_USER_REVIEWS" }),
       sendRuntimeMessage({ type: "GET_ARTIFACT_PRESENCE" }),
       sendRuntimeMessage({ type: "GET_CUSTOM_SCORE_SETTINGS" }),
-      sendRuntimeMessage({ type: "GET_UNWANTED_SKILL_CONFIG" }),
     ]);
 
     if (!artifactResponse.ok) {
@@ -241,16 +236,6 @@ function Dashboard() {
     } else {
       setCustomScoreSettings(DEFAULT_CUSTOM_SCORE_SETTINGS);
       setScoreSettingsError("スコア設定を読み込めませんでした。");
-    }
-
-    if (
-      unwantedSkillConfigResponse.ok &&
-      unwantedSkillConfigResponse.type === "UNWANTED_SKILL_CONFIG"
-    ) {
-      setUnwantedSkillConfig(unwantedSkillConfigResponse.config);
-    } else {
-      setUnwantedSkillConfig(DEFAULT_UNWANTED_SKILL_CONFIG);
-      setUnwantedSkillError("不要スキル設定を読み込めませんでした。");
     }
 
     if (customScoreSettingsResponse.ok) {
@@ -346,14 +331,16 @@ function Dashboard() {
     return true;
   };
 
-  const saveIdealMatchScores = async (scores: IdealMatchScores) => {
+  const saveIdealMatchScores = async (
+    scores: IdealMatchScores,
+  ): Promise<boolean> => {
     const validationError = validateIdealMatchScores(scores);
 
     if (validationError !== null) {
       setIdealMatchScoreError(
         "スコアは0～100の整数で、一致数が増えるほど低くならないように設定してください。",
       );
-      return;
+      return false;
     }
 
     setIdealMatchScoreError(null);
@@ -363,218 +350,61 @@ function Dashboard() {
       updatedAt: new Date().toISOString(),
     };
 
-    await saveScoreSettings(
+    return saveScoreSettings(
       settings,
       setIdealMatchScoreError,
       "一致数スコアを保存できませんでした。",
     );
   };
 
-  const addIdealSkill = async () => {
-    if (selectedIdealSkillKey.length === 0) {
-      setIdealSkillError("追加するスキルを選択してください。");
-      return;
-    }
-
-    if (customScoreSettings.idealSkillKeys.includes(selectedIdealSkillKey)) {
-      setIdealSkillError("このスキルはすでに選択されています。");
-      return;
-    }
-
-    if (customScoreSettings.idealSkillKeys.length >= 4) {
-      setIdealSkillError("理想スキルは4つまで選択できます。");
-      return;
-    }
-
-    const nextSettings: CustomScoreSettings = {
-      ...customScoreSettings,
-      idealSkillKeys: [
-        ...customScoreSettings.idealSkillKeys,
-        selectedIdealSkillKey,
-      ],
-      updatedAt: new Date().toISOString(),
-    };
-
-    const didSave = await saveScoreSettings(
-      nextSettings,
-      setIdealSkillError,
-      "理想スキルを保存できませんでした。",
-    );
-
-    if (didSave) {
-      setSelectedIdealSkillKey("");
-    }
-  };
-
-  const removeIdealSkill = async (skillKey: string) => {
-    const nextSettings: CustomScoreSettings = {
-      ...customScoreSettings,
-      idealSkillKeys: customScoreSettings.idealSkillKeys.filter(
-        (currentSkillKey) => currentSkillKey !== skillKey,
-      ),
-      updatedAt: new Date().toISOString(),
-    };
-
-    await saveScoreSettings(
-      nextSettings,
-      setIdealSkillError,
-      "理想スキルを保存できませんでした。",
-    );
-  };
-
-  const addPrioritySkill = async () => {
-    if (selectedPrioritySkillKey.length === 0) {
-      setPrioritySkillError("追加するスキルを選択してください。");
-      return;
-    }
-
-    if (
-      customScoreSettings.skillPriority.some(
-        (entry) => entry.skillKey === selectedPrioritySkillKey,
-      )
-    ) {
-      setPrioritySkillError("このスキルはすでに選択されています。");
-      return;
-    }
-
-    const nextSkillPriority = reassignSkillPriorityRanks([
-      ...getSortedSkillPriorityEntries(customScoreSettings.skillPriority),
-      {
-        skillKey: selectedPrioritySkillKey,
-        rank: customScoreSettings.skillPriority.length + 1,
-      },
-    ]);
-    const nextSettings: CustomScoreSettings = {
-      ...customScoreSettings,
-      skillPriority: nextSkillPriority,
-      updatedAt: new Date().toISOString(),
-    };
-
-    const didSave = await saveScoreSettings(
-      nextSettings,
-      setPrioritySkillError,
-      "スキル優先度を保存できませんでした。",
-    );
-
-    if (didSave) {
-      setSelectedPrioritySkillKey("");
-    }
-  };
-
-  const removePrioritySkill = async (skillKey: string) => {
-    const nextSkillPriority = reassignSkillPriorityRanks(
-      getSortedSkillPriorityEntries(customScoreSettings.skillPriority).filter(
-        (entry) => entry.skillKey !== skillKey,
-      ),
-    );
-    const nextSettings: CustomScoreSettings = {
-      ...customScoreSettings,
-      skillPriority: nextSkillPriority,
-      updatedAt: new Date().toISOString(),
-    };
-
-    await saveScoreSettings(
-      nextSettings,
-      setPrioritySkillError,
-      "スキル優先度を保存できませんでした。",
-    );
-  };
-
-  const movePrioritySkill = async (skillKey: string, direction: -1 | 1) => {
-    const sortedSkillPriority = getSortedSkillPriorityEntries(
-      customScoreSettings.skillPriority,
-    );
-    const currentIndex = sortedSkillPriority.findIndex(
-      (entry) => entry.skillKey === skillKey,
-    );
-    const nextIndex = currentIndex + direction;
-
-    if (
-      currentIndex < 0 ||
-      nextIndex < 0 ||
-      nextIndex >= sortedSkillPriority.length
-    ) {
-      return;
-    }
-
-    const reorderedSkillPriority = [...sortedSkillPriority];
-    const currentEntry = reorderedSkillPriority[currentIndex];
-    const nextEntry = reorderedSkillPriority[nextIndex];
-
-    if (currentEntry === undefined || nextEntry === undefined) {
-      return;
-    }
-
-    reorderedSkillPriority[currentIndex] = nextEntry;
-    reorderedSkillPriority[nextIndex] = currentEntry;
-
-    const nextSettings: CustomScoreSettings = {
-      ...customScoreSettings,
-      skillPriority: reassignSkillPriorityRanks(reorderedSkillPriority),
-      updatedAt: new Date().toISOString(),
-    };
-
-    await saveScoreSettings(
-      nextSettings,
-      setPrioritySkillError,
-      "スキル優先度を保存できませんでした。",
-    );
-  };
-
-  const saveUnwantedSkills = async (
-    config: UnwantedSkillConfig,
+  const saveIdealSkillConfigurations = async (
+    configurations: IdealSkillConfiguration[],
   ): Promise<boolean> => {
-    setUnwantedSkillError(null);
+    const validationError = validateIdealSkillConfigurations(configurations);
 
-    const response = await sendRuntimeMessage({
-      type: "SAVE_UNWANTED_SKILL_CONFIG",
-      config,
-    });
-
-    if (!response.ok) {
-      setUnwantedSkillError("不要スキルを保存できませんでした。");
+    if (validationError !== null) {
+      setIdealSkillError(
+        validationError.includes("overlap")
+          ? "属性と武器種の適用範囲が、ほかの理想構成と重複しています。"
+          : "各構成では属性と武器種を1つ以上選択してください。",
+      );
       return false;
     }
 
-    if (response.type === "SAVE_UNWANTED_SKILL_CONFIG_RESULT") {
-      setUnwantedSkillConfig(response.config);
-    }
-
-    return true;
-  };
-
-  const addUnwantedSkill = async () => {
-    if (selectedUnwantedSkillKey.length === 0) {
-      setUnwantedSkillError("追加するスキルを選択してください。");
-      return;
-    }
-
-    if (unwantedSkillConfig.skillKeys.includes(selectedUnwantedSkillKey)) {
-      setUnwantedSkillError("このスキルはすでに選択されています。");
-      return;
-    }
-
-    const nextConfig: UnwantedSkillConfig = {
-      skillKeys: [...unwantedSkillConfig.skillKeys, selectedUnwantedSkillKey],
+    const nextSettings: CustomScoreSettings = {
+      ...customScoreSettings,
+      idealSkillConfigurations: configurations,
       updatedAt: new Date().toISOString(),
     };
 
-    const didSave = await saveUnwantedSkills(nextConfig);
-
-    if (didSave) {
-      setSelectedUnwantedSkillKey("");
-    }
+    return saveScoreSettings(
+      nextSettings,
+      setIdealSkillError,
+      "理想構成を保存できませんでした。",
+    );
   };
 
-  const removeUnwantedSkill = async (skillKey: string) => {
-    const nextConfig: UnwantedSkillConfig = {
-      skillKeys: unwantedSkillConfig.skillKeys.filter(
-        (currentSkillKey) => currentSkillKey !== skillKey,
-      ),
+  const saveSkillScores = async (
+    skillScores: SkillScores,
+  ): Promise<boolean> => {
+    const validationError = validateSkillScores(skillScores);
+
+    if (validationError !== null) {
+      setPrioritySkillError("各スキルの点数を0～25の整数で設定してください。");
+      return false;
+    }
+
+    const nextSettings: CustomScoreSettings = {
+      ...customScoreSettings,
+      skillScores,
       updatedAt: new Date().toISOString(),
     };
 
-    await saveUnwantedSkills(nextConfig);
+    return saveScoreSettings(
+      nextSettings,
+      setPrioritySkillError,
+      "スキルスコアを保存できませんでした。",
+    );
   };
 
   const updateMemoDraft = (ownedId: number, memo: string) => {
@@ -752,37 +582,17 @@ function Dashboard() {
                 <p className="errorText">{scoreSettingsError}</p>
               )}
               <IdealSkillEditor
+                configurations={customScoreSettings.idealSkillConfigurations}
                 errorMessage={idealSkillError}
-                idealSkillKeys={customScoreSettings.idealSkillKeys}
-                onAddSkill={addIdealSkill}
-                onRemoveSkill={removeIdealSkill}
-                onSelectedSkillChange={setSelectedIdealSkillKey}
-                options={skillCatalogOptions}
-                selectedSkillKey={selectedIdealSkillKey}
-              />
-              <IdealMatchScoreEditor
-                errorMessage={idealMatchScoreError}
-                onSave={saveIdealMatchScores}
+                idealMatchScoreError={idealMatchScoreError}
+                onSaveConfigurations={saveIdealSkillConfigurations}
+                onSaveIdealMatchScores={saveIdealMatchScores}
                 settings={customScoreSettings}
               />
-              <SkillPriorityEditor
+              <SkillScoreEditor
                 errorMessage={prioritySkillError}
-                onAddSkill={addPrioritySkill}
-                onMoveSkill={movePrioritySkill}
-                onRemoveSkill={removePrioritySkill}
-                onSelectedSkillChange={setSelectedPrioritySkillKey}
-                options={skillCatalogOptions}
-                selectedSkillKey={selectedPrioritySkillKey}
-                skillPriority={customScoreSettings.skillPriority}
-              />
-              <UnwantedSkillEditor
-                errorMessage={unwantedSkillError}
-                onAddSkill={addUnwantedSkill}
-                onRemoveSkill={removeUnwantedSkill}
-                onSelectedSkillChange={setSelectedUnwantedSkillKey}
-                options={skillCatalogOptions}
-                selectedSkillKey={selectedUnwantedSkillKey}
-                unwantedSkillKeys={unwantedSkillConfig.skillKeys}
+                onSave={saveSkillScores}
+                skillScores={customScoreSettings.skillScores}
               />
             </section>
           )}
@@ -864,66 +674,367 @@ function StatisticsSummary({ statistics }: { statistics: ArtifactStatistics }) {
 }
 
 function IdealSkillEditor({
+  configurations,
   errorMessage,
-  idealSkillKeys,
-  onAddSkill,
-  onRemoveSkill,
-  onSelectedSkillChange,
-  options,
-  selectedSkillKey,
+  idealMatchScoreError,
+  onSaveConfigurations,
+  onSaveIdealMatchScores,
+  settings,
 }: {
+  configurations: IdealSkillConfiguration[];
   errorMessage: string | null;
-  idealSkillKeys: string[];
-  onAddSkill: () => void;
-  onRemoveSkill: (skillKey: string) => void;
-  onSelectedSkillChange: (skillKey: string) => void;
-  options: SkillCatalogOption[];
-  selectedSkillKey: string;
+  idealMatchScoreError: string | null;
+  onSaveConfigurations: (
+    configurations: IdealSkillConfiguration[],
+  ) => Promise<boolean>;
+  onSaveIdealMatchScores: (scores: IdealMatchScores) => Promise<boolean>;
+  settings: CustomScoreSettings;
 }) {
+  const idealMatchScoreDialogRef = useRef<HTMLDialogElement>(null);
+  const [draftConfigurations, setDraftConfigurations] = useState<
+    IdealSkillConfiguration[]
+  >(() => configurations.map(cloneIdealSkillConfiguration));
+  const [isDirty, setIsDirty] = useState(false);
+
+  useEffect(() => {
+    if (!isDirty) {
+      setDraftConfigurations(configurations.map(cloneIdealSkillConfiguration));
+    }
+  }, [configurations, isDirty]);
+
+  const updateConfiguration = (
+    configurationId: string,
+    update: (configuration: IdealSkillConfiguration) => IdealSkillConfiguration,
+  ) => {
+    setIsDirty(true);
+    setDraftConfigurations((current) =>
+      current.map((configuration) =>
+        configuration.id === configurationId
+          ? update(configuration)
+          : configuration,
+      ),
+    );
+  };
+
+  const toggleAttribute = (
+    configurationId: string,
+    attributeKey: IdealSkillConfiguration["attributeKeys"][number],
+  ) => {
+    updateConfiguration(configurationId, (configuration) => ({
+      ...configuration,
+      attributeKeys: toggleSelectedValue(
+        configuration.attributeKeys,
+        attributeKey,
+      ),
+    }));
+  };
+
+  const toggleKind = (
+    configurationId: string,
+    kindKey: IdealSkillConfiguration["kindKeys"][number],
+  ) => {
+    updateConfiguration(configurationId, (configuration) => ({
+      ...configuration,
+      kindKeys: toggleSelectedValue(configuration.kindKeys, kindKey),
+    }));
+  };
+
+  const addConfiguration = () => {
+    setIsDirty(true);
+    setDraftConfigurations((current) => [
+      ...current,
+      createEmptyIdealSkillConfiguration(`ideal-${crypto.randomUUID()}`),
+    ]);
+  };
+
+  const saveConfigurations = async () => {
+    if (await onSaveConfigurations(draftConfigurations)) {
+      setIsDirty(false);
+    }
+  };
+
+  const saveMatchScores = async (scores: IdealMatchScores) => {
+    if (await onSaveIdealMatchScores(scores)) {
+      idealMatchScoreDialogRef.current?.close();
+    }
+  };
+
   return (
     <section className="idealSkillEditor" aria-label="理想スキル">
-      <h3>理想スキル</h3>
-      {idealSkillKeys.length === 0 ? (
-        <p className="mutedText">理想スキルが選択されていません。</p>
+      <div className="idealSkillEditorHeader">
+        <div>
+          <h3>理想スキル構成</h3>
+          <p className="mutedText">
+            未選択のスキル枠は、どのスキルでも一致として扱います。
+          </p>
+        </div>
+        <div className="idealSkillEditorActions">
+          <button
+            type="button"
+            onClick={() => idealMatchScoreDialogRef.current?.showModal()}
+          >
+            一致数スコア設定
+          </button>
+          <button type="button" onClick={addConfiguration}>
+            構成を追加
+          </button>
+        </div>
+      </div>
+      <dialog
+        className="idealMatchScoreDialog"
+        ref={idealMatchScoreDialogRef}
+        aria-labelledby="ideal-match-score-dialog-title"
+      >
+        <div className="idealMatchScoreDialogHeader">
+          <h3 id="ideal-match-score-dialog-title">一致数スコア設定</h3>
+          <button
+            type="button"
+            onClick={() => idealMatchScoreDialogRef.current?.close()}
+          >
+            閉じる
+          </button>
+        </div>
+        <IdealMatchScoreEditor
+          errorMessage={idealMatchScoreError}
+          onSave={saveMatchScores}
+          settings={settings}
+        />
+      </dialog>
+      {draftConfigurations.length === 0 ? (
+        <p className="mutedText">理想構成が登録されていません。</p>
       ) : (
-        <div className="scoreSkillChips">
-          {idealSkillKeys.map((skillKey) => (
-            <button
-              className="scoreSkillChip"
-              key={skillKey}
-              type="button"
-              onClick={() => onRemoveSkill(skillKey)}
-              title="理想スキルから削除"
-            >
-              {getSkillOptionLabel(skillKey, options)} ×
-            </button>
-          ))}
+        <div className="tableScroller idealConfigurationTableScroller">
+          <table className="idealConfigurationTable">
+            <thead>
+              <tr>
+                <th>削除</th>
+                <th>No.</th>
+                <th>属性</th>
+                <th>武器種</th>
+                <th>1～2枠①</th>
+                <th>1～2枠②</th>
+                <th>3枠</th>
+                <th>4枠</th>
+                <th>コメント</th>
+              </tr>
+            </thead>
+            <tbody>
+              {draftConfigurations.map((configuration, index) => (
+                <tr key={configuration.id}>
+                  <td>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsDirty(true);
+                        setDraftConfigurations((current) =>
+                          current.filter(
+                            (item) => item.id !== configuration.id,
+                          ),
+                        );
+                      }}
+                    >
+                      削除
+                    </button>
+                  </td>
+                  <td className="idealConfigurationNumber">{index + 1}</td>
+                  <td>
+                    <IdealConditionSelector
+                      label="属性"
+                      options={ARTIFACT_ATTRIBUTE_OPTIONS}
+                      selectedKeys={configuration.attributeKeys}
+                      onToggle={(key) => toggleAttribute(configuration.id, key)}
+                    />
+                  </td>
+                  <td>
+                    <IdealConditionSelector
+                      label="武器種"
+                      options={ARTIFACT_KIND_OPTIONS}
+                      selectedKeys={configuration.kindKeys}
+                      onToggle={(key) => toggleKind(configuration.id, key)}
+                    />
+                  </td>
+                  <td>
+                    <IdealSkillSelect
+                      label="1～2枠（1つ目）"
+                      options={IDEAL_FIRST_SECOND_SLOT_OPTIONS}
+                      value={configuration.firstSecondSlotSkillKeys[0]}
+                      onChange={(skillKey) =>
+                        updateConfiguration(configuration.id, (current) => ({
+                          ...current,
+                          firstSecondSlotSkillKeys: [
+                            skillKey,
+                            current.firstSecondSlotSkillKeys[1],
+                          ],
+                        }))
+                      }
+                    />
+                  </td>
+                  <td>
+                    <IdealSkillSelect
+                      label="1～2枠（2つ目）"
+                      options={IDEAL_FIRST_SECOND_SLOT_OPTIONS}
+                      value={configuration.firstSecondSlotSkillKeys[1]}
+                      onChange={(skillKey) =>
+                        updateConfiguration(configuration.id, (current) => ({
+                          ...current,
+                          firstSecondSlotSkillKeys: [
+                            current.firstSecondSlotSkillKeys[0],
+                            skillKey,
+                          ],
+                        }))
+                      }
+                    />
+                  </td>
+                  <td>
+                    <IdealSkillSelect
+                      label="3枠"
+                      options={IDEAL_THIRD_SLOT_OPTIONS}
+                      value={configuration.thirdSlotSkillKey}
+                      onChange={(skillKey) =>
+                        updateConfiguration(configuration.id, (current) => ({
+                          ...current,
+                          thirdSlotSkillKey: skillKey,
+                        }))
+                      }
+                    />
+                  </td>
+                  <td>
+                    <IdealSkillSelect
+                      label="4枠"
+                      options={IDEAL_FOURTH_SLOT_OPTIONS}
+                      value={configuration.fourthSlotSkillKey}
+                      onChange={(skillKey) =>
+                        updateConfiguration(configuration.id, (current) => ({
+                          ...current,
+                          fourthSlotSkillKey: skillKey,
+                        }))
+                      }
+                    />
+                  </td>
+                  <td>
+                    <input
+                      className="idealConfigurationComment"
+                      type="text"
+                      value={configuration.comment}
+                      placeholder="コメントを入力"
+                      aria-label={`理想構成${index + 1}のコメント`}
+                      onChange={(event) =>
+                        updateConfiguration(configuration.id, (current) => ({
+                          ...current,
+                          comment: event.currentTarget.value,
+                        }))
+                      }
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
-      <div className="scoreSettingRow">
-        <label>
-          理想スキルを追加
-          <select
-            value={selectedSkillKey}
-            onChange={(event) =>
-              onSelectedSkillChange(event.currentTarget.value)
-            }
-          >
-            <option value="">スキルを選択</option>
-            {options.map((option) => (
-              <option key={option.key} value={option.key}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="button" onClick={onAddSkill}>
-          追加
-        </button>
-      </div>
+      <button type="button" onClick={() => void saveConfigurations()}>
+        理想構成を保存
+      </button>
       {errorMessage !== null && <p className="errorText">{errorMessage}</p>}
     </section>
   );
+}
+
+function IdealConditionSelector<T extends string>({
+  label,
+  onToggle,
+  options,
+  selectedKeys,
+}: {
+  label: string;
+  onToggle: (key: T) => void;
+  options: ReadonlyArray<{ key: T; label: string }>;
+  selectedKeys: T[];
+}) {
+  const selectedLabels = options
+    .filter((option) => selectedKeys.includes(option.key))
+    .map((option) => option.label);
+  const summary =
+    selectedLabels.length === options.length
+      ? "すべて"
+      : selectedLabels.length === 0
+        ? "未選択"
+        : selectedLabels.join("・");
+
+  return (
+    <details className="idealConditionSelector">
+      <summary title={`${label}: ${summary}`}>{summary}</summary>
+      <fieldset className="idealConditionOptions">
+        <legend className="visuallyHidden">{label}</legend>
+        {options.map((option) => (
+          <label key={option.key}>
+            <input
+              checked={selectedKeys.includes(option.key)}
+              type="checkbox"
+              onChange={() => onToggle(option.key)}
+            />
+            <span>{option.label}</span>
+          </label>
+        ))}
+      </fieldset>
+    </details>
+  );
+}
+
+function IdealSkillSelect({
+  label,
+  onChange,
+  options,
+  value,
+}: {
+  label: string;
+  onChange: (skillKey: string | null) => void;
+  options: readonly IdealSkillOption[];
+  value: string | null;
+}) {
+  return (
+    <label className="idealSkillTableSelect">
+      <span className="visuallyHidden">{label}</span>
+      <select
+        title={label}
+        value={value ?? ""}
+        onChange={(event) =>
+          onChange(
+            event.currentTarget.value.length === 0
+              ? null
+              : event.currentTarget.value,
+          )
+        }
+      >
+        <option value="">未選択（どのスキルでも一致）</option>
+        {options.map((option) => (
+          <option key={option.key} value={option.key}>
+            {option.label.replaceAll("&", "/")}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function cloneIdealSkillConfiguration(
+  configuration: IdealSkillConfiguration,
+): IdealSkillConfiguration {
+  return {
+    ...configuration,
+    attributeKeys: [...configuration.attributeKeys],
+    kindKeys: [...configuration.kindKeys],
+    firstSecondSlotSkillKeys: [
+      configuration.firstSecondSlotSkillKeys[0],
+      configuration.firstSecondSlotSkillKeys[1],
+    ],
+  };
+}
+
+function toggleSelectedValue<T>(values: T[], value: T): T[] {
+  return values.includes(value)
+    ? values.filter((current) => current !== value)
+    : [...values, value];
 }
 
 function IdealMatchScoreEditor({
@@ -954,7 +1065,6 @@ function IdealMatchScoreEditor({
 
   return (
     <section className="idealMatchScoreEditor" aria-label="一致数スコア">
-      <h3>一致数スコア</h3>
       <p className="mutedText">
         理想スキルの一致数ごとの基礎スコアです。テーブルランク補正は、この基礎スコアへ後から適用されます。
       </p>
@@ -983,152 +1093,151 @@ function IdealMatchScoreEditor({
   );
 }
 
-function UnwantedSkillEditor({
+function SkillScoreEditor({
   errorMessage,
-  onAddSkill,
-  onRemoveSkill,
-  onSelectedSkillChange,
-  options,
-  selectedSkillKey,
-  unwantedSkillKeys,
+  onSave,
+  skillScores,
 }: {
   errorMessage: string | null;
-  onAddSkill: () => void;
-  onRemoveSkill: (skillKey: string) => void;
-  onSelectedSkillChange: (skillKey: string) => void;
-  options: SkillCatalogOption[];
-  selectedSkillKey: string;
-  unwantedSkillKeys: string[];
+  onSave: (skillScores: SkillScores) => Promise<boolean>;
+  skillScores: SkillScores;
 }) {
+  const [activeTab, setActiveTab] =
+    useState<keyof SkillScores>("firstSecondSlot");
+  const [draftSkillScores, setDraftSkillScores] = useState<SkillScores>(() =>
+    cloneSkillScores(skillScores),
+  );
+  const [isDirty, setIsDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const draftRevisionRef = useRef(0);
+  const activeOptions = getSkillScoreOptions(activeTab);
+  const activeEntries = draftSkillScores[activeTab];
+
+  useEffect(() => {
+    if (!isDirty) {
+      setDraftSkillScores(cloneSkillScores(skillScores));
+      draftRevisionRef.current = 0;
+    }
+  }, [isDirty, skillScores]);
+
+  const updateScore = (skillKey: string, score: number) => {
+    draftRevisionRef.current += 1;
+    setIsDirty(true);
+    setDraftSkillScores((current) => ({
+      ...current,
+      [activeTab]: current[activeTab].map((entry) =>
+        entry.skillKey === skillKey ? { ...entry, score } : entry,
+      ),
+    }));
+  };
+
+  const saveScores = async () => {
+    if (isSaving) {
+      return;
+    }
+
+    const submittedRevision = draftRevisionRef.current;
+    setIsSaving(true);
+
+    try {
+      if (
+        (await onSave(draftSkillScores)) &&
+        draftRevisionRef.current === submittedRevision
+      ) {
+        setIsDirty(false);
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
-    <section className="unwantedSkillEditor" aria-label="不要スキル">
-      <h3>不要スキル</h3>
-      {unwantedSkillKeys.length === 0 ? (
-        <p className="mutedText">不要スキルが選択されていません。</p>
-      ) : (
-        <div className="scoreSkillChips">
-          {unwantedSkillKeys.map((skillKey) => (
-            <button
-              className="scoreSkillChip"
-              key={skillKey}
-              type="button"
-              onClick={() => onRemoveSkill(skillKey)}
-              title="不要スキルから削除"
-            >
-              {getSkillOptionLabel(skillKey, options)} ×
-            </button>
-          ))}
-        </div>
-      )}
-      <div className="scoreSettingRow">
-        <label>
-          不要スキルを追加
-          <select
-            value={selectedSkillKey}
-            onChange={(event) =>
-              onSelectedSkillChange(event.currentTarget.value)
-            }
+    <section className="skillScoreEditor" aria-label="スキルスコア">
+      <h3>スキルスコア</h3>
+      <p className="mutedText">
+        各スキルの基礎点を0～25で設定します。4枠の合計基礎点は最大100です。
+      </p>
+      <div className="skillScoreTabs" role="tablist" aria-label="スキル枠">
+        {SKILL_SCORE_TABS.map((tab) => (
+          <button
+            className={tab.key === activeTab ? "active" : undefined}
+            key={tab.key}
+            type="button"
+            role="tab"
+            aria-selected={tab.key === activeTab}
+            onClick={() => setActiveTab(tab.key)}
           >
-            <option value="">スキルを選択</option>
-            {options.map((option) => (
-              <option key={option.key} value={option.key}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="button" onClick={onAddSkill}>
-          追加
-        </button>
+            {tab.label}
+          </button>
+        ))}
       </div>
+      <div className="skillScoreGrid" role="tabpanel">
+        {activeOptions.map((option) => {
+          const score =
+            activeEntries.find((entry) => entry.skillKey === option.key)
+              ?.score ?? 0;
+
+          return (
+            <label className="skillScoreSlider" key={option.key}>
+              <span title={option.label}>{option.label}</span>
+              <input
+                type="range"
+                min={0}
+                max={25}
+                step={1}
+                value={score}
+                onChange={(event) =>
+                  updateScore(
+                    option.key,
+                    Number.parseInt(event.currentTarget.value, 10),
+                  )
+                }
+              />
+              <output>{score}</output>
+            </label>
+          );
+        })}
+      </div>
+      <button
+        type="button"
+        disabled={isSaving}
+        onClick={() => void saveScores()}
+      >
+        {isSaving ? "保存中..." : "スキルスコアを保存"}
+      </button>
       {errorMessage !== null && <p className="errorText">{errorMessage}</p>}
     </section>
   );
 }
 
-function SkillPriorityEditor({
-  errorMessage,
-  onAddSkill,
-  onMoveSkill,
-  onRemoveSkill,
-  onSelectedSkillChange,
-  options,
-  selectedSkillKey,
-  skillPriority,
-}: {
-  errorMessage: string | null;
-  onAddSkill: () => void;
-  onMoveSkill: (skillKey: string, direction: -1 | 1) => void;
-  onRemoveSkill: (skillKey: string) => void;
-  onSelectedSkillChange: (skillKey: string) => void;
-  options: SkillCatalogOption[];
-  selectedSkillKey: string;
-  skillPriority: CustomScoreSettings["skillPriority"];
-}) {
-  const sortedSkillPriority = getSortedSkillPriorityEntries(skillPriority);
+const SKILL_SCORE_TABS: ReadonlyArray<{
+  key: keyof SkillScores;
+  label: string;
+}> = [
+  { key: "firstSecondSlot", label: "1～2枠" },
+  { key: "thirdSlot", label: "3枠" },
+  { key: "fourthSlot", label: "4枠" },
+];
 
-  return (
-    <section className="skillPriorityEditor" aria-label="スキル優先度">
-      <h3>スキル優先度</h3>
-      {sortedSkillPriority.length === 0 ? (
-        <p className="mutedText">優先スキルが選択されていません。</p>
-      ) : (
-        <ol className="skillPriorityList">
-          {sortedSkillPriority.map((entry, index) => (
-            <li key={entry.skillKey}>
-              <span>
-                {entry.rank}. {getSkillOptionLabel(entry.skillKey, options)}
-              </span>
-              <div className="skillPriorityActions">
-                <button
-                  type="button"
-                  onClick={() => onMoveSkill(entry.skillKey, -1)}
-                  disabled={index === 0}
-                >
-                  ↑
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onMoveSkill(entry.skillKey, 1)}
-                  disabled={index === sortedSkillPriority.length - 1}
-                >
-                  ↓
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onRemoveSkill(entry.skillKey)}
-                >
-                  削除
-                </button>
-              </div>
-            </li>
-          ))}
-        </ol>
-      )}
-      <div className="scoreSettingRow">
-        <label>
-          優先スキルを追加
-          <select
-            value={selectedSkillKey}
-            onChange={(event) =>
-              onSelectedSkillChange(event.currentTarget.value)
-            }
-          >
-            <option value="">スキルを選択</option>
-            {options.map((option) => (
-              <option key={option.key} value={option.key}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="button" onClick={onAddSkill}>
-          追加
-        </button>
-      </div>
-      {errorMessage !== null && <p className="errorText">{errorMessage}</p>}
-    </section>
-  );
+function getSkillScoreOptions(
+  tab: keyof SkillScores,
+): readonly IdealSkillOption[] {
+  if (tab === "firstSecondSlot") {
+    return IDEAL_FIRST_SECOND_SLOT_OPTIONS;
+  }
+  if (tab === "thirdSlot") {
+    return IDEAL_THIRD_SLOT_OPTIONS;
+  }
+
+  return IDEAL_FOURTH_SLOT_OPTIONS;
+}
+
+function cloneSkillScores(skillScores: SkillScores): SkillScores {
+  return {
+    firstSecondSlot: skillScores.firstSecondSlot.map((entry) => ({ ...entry })),
+    thirdSlot: skillScores.thirdSlot.map((entry) => ({ ...entry })),
+    fourthSlot: skillScores.fourthSlot.map((entry) => ({ ...entry })),
+  };
 }
 
 function SummaryCard({
@@ -1699,7 +1808,6 @@ function buildArtifactScoreViewModel(args: {
   review: ArtifactUserReview | null;
   presence: ArtifactPresence | null;
   scoreSettings: CustomScoreSettings;
-  unwantedSkillConfig: UnwantedSkillConfig;
 }): ReviewedArtifactRow {
   return {
     artifact: args.artifact,
@@ -1708,35 +1816,12 @@ function buildArtifactScoreViewModel(args: {
     customScore: evaluateCustomScore({
       artifact: args.artifact,
       settings: args.scoreSettings,
-      unwantedSkillConfig: args.unwantedSkillConfig,
     }),
   };
 }
 
 function getDashboardTabClassName(isActive: boolean): string {
   return isActive ? "dashboardTab active" : "dashboardTab";
-}
-
-function getSortedSkillPriorityEntries(
-  skillPriority: CustomScoreSettings["skillPriority"],
-): CustomScoreSettings["skillPriority"] {
-  return [...skillPriority].sort((left, right) => left.rank - right.rank);
-}
-
-function reassignSkillPriorityRanks(
-  skillPriority: CustomScoreSettings["skillPriority"],
-): CustomScoreSettings["skillPriority"] {
-  return skillPriority.map((entry, index) => ({
-    ...entry,
-    rank: index + 1,
-  }));
-}
-
-function getSkillOptionLabel(
-  skillKey: string,
-  options: SkillCatalogOption[],
-): string {
-  return options.find((option) => option.key === skillKey)?.label ?? skillKey;
 }
 
 function formatShortScoreReasons(reasons: ScoreReason[]): string {

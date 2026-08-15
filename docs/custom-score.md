@@ -8,7 +8,6 @@ The score should reflect:
 
 - How close the artifact is to an ideal skill composition.
 - Whether the artifact has high-value skills.
-- Whether the artifact has unwanted skills.
 - Whether the artifact has high effect table values.
 
 The first implementation should be practical and explainable, not a free-form formula editor.
@@ -18,8 +17,7 @@ The first implementation should be practical and explainable, not a free-form fo
 Phase 1 requires the user to define:
 
 1. Ideal skill composition
-2. Skill priority order
-3. Unwanted skills
+2. Per-skill scores for slots 1–2, slot 3, and slot 4
 
 ## Artifact Evaluation Model
 
@@ -49,8 +47,13 @@ idealRouteScore =
 
 ### Matching Rules
 
-* Slot position is ignored.
-* Matching is based on normalized skill keys.
+* Select the single configuration matching the artifact attribute and weapon kind.
+* Configuration attribute and weapon-kind ranges must not overlap.
+* Slots 1 and 2 are matched as an unordered pair.
+* Slots 3 and 4 are matched against their corresponding artifact slots.
+* An unselected skill slot is a wildcard and counts as a match.
+* Wildcard matches do not receive a table-rank multiplier.
+* Selected skills are matched using stable keys and normalized API labels.
 * Match levels:
 
   * 1/4
@@ -58,52 +61,25 @@ idealRouteScore =
   * 3/4
   * 4/4
 
-### Why Unwanted Skills Are Not Central Here
-
-An artifact close to the ideal skill composition can still be valuable even if it has one unwanted skill.
-
-Reason:
-
-* Some in-game items can change a skill.
-* Therefore, ideal closeness is more important than unwanted skill penalty in this route.
-
 ## Route 2: Priority Route
 
-The priority route measures general value based on skill priority.
+The priority route measures general value using a user-defined score for every skill in each slot group.
 
 ```text
 priorityRouteScore =
-  skill priority score
+  sum of per-skill scores
   + table multiplier
-  - unwanted skill penalty
 ```
 
-### Skill Priority
+### Per-Skill Scores
 
-Users define skill priority as an ordered list.
+Users assign an integer score from 0 to 25 to every available skill in these groups:
 
-Example:
+* Slots 1–2
+* Slot 3
+* Slot 4
 
-```text
-通常攻撃ダメージ上限
-> 自属性攻撃力
-> トリプルアタック確率
-> 攻撃力
-```
-
-Higher-ranked skills produce higher base score.
-
-### Unwanted Skills
-
-Unwanted skills are global.
-
-They are not profile-specific in Phase 1.
-
-Penalty behavior:
-
-* 0 unwanted skills: no penalty
-* 1 unwanted skill: large penalty
-* 2 or more unwanted skills: progressive penalty
+The four skill scores sum to a maximum base score of 100 before table-rank multipliers. Unwanted-skill metadata does not affect score calculation.
 
 ## Effect Table Rank
 
@@ -114,12 +90,12 @@ Rules:
 * `e` is best.
 * `a` is worst.
 * Table rank modifies skill score by multiplier.
-* Table rank should not overpower skill priority.
+* Table rank should not overpower the configured skill score.
 
 Example:
 
 ```text
-important skill d: 30 * 1.15 = 34.5
+important skill d: 25 * 1.15 = 28.75
 minor skill e:     10 * 1.25 = 12.5
 ```
 
@@ -171,40 +147,35 @@ Reasoning:
 * Table quality matters.
 * Skill identity should matter more than table quality.
 
-### Unwanted Penalty
-
-```ts
-const UNWANTED_SKILL_PENALTY = {
-  0: 0,
-  1: 25,
-  2: 60,
-  3: 100,
-  4: 150,
-} as const;
-```
-
-Reasoning:
-
-* One unwanted skill is significant but not fatal.
-* Multiple unwanted skills should quickly reduce general value.
-
 ## Conceptual Types
 
 ```ts
 type CustomScoreSettings = {
-  idealSkillKeys: string[];
+  idealSkillConfigurations: IdealSkillConfiguration[];
   idealMatchScores: IdealMatchScores;
-  skillPriority: SkillPriorityEntry[];
+  skillScores: SkillScores;
   updatedAt: string;
 };
 
-type SkillPriorityEntry = {
-  skillKey: string;
-  rank: number;
+type IdealSkillConfiguration = {
+  id: string;
+  comment: string;
+  attributeKeys: string[];
+  kindKeys: string[];
+  firstSecondSlotSkillKeys: [string | null, string | null];
+  thirdSlotSkillKey: string | null;
+  fourthSlotSkillKey: string | null;
 };
 
-type UnwantedSkillConfig = {
-  skillKeys: string[];
+type SkillScoreEntry = {
+  skillKey: string;
+  score: number;
+};
+
+type SkillScores = {
+  firstSecondSlot: SkillScoreEntry[];
+  thirdSlot: SkillScoreEntry[];
+  fourthSlot: SkillScoreEntry[];
 };
 
 type ScoreResult = {
@@ -219,8 +190,7 @@ type ScoreReason = {
   type:
     | "ideal_match"
     | "priority_skill"
-    | "table_multiplier"
-    | "unwanted_penalty";
+    | "table_multiplier";
   skillKey?: string;
   label: string;
   delta: number;
@@ -266,7 +236,7 @@ Responsibilities:
   * Calculates ideal composition score.
 * `evaluatePriorityRoute.ts`
 
-  * Calculates priority score and unwanted penalties.
+  * Calculates the sum of configured per-skill scores and table multipliers.
 * `scoreExplanation.ts`
 
   * Produces UI-friendly explanation reasons.
@@ -278,7 +248,6 @@ Do not store calculated score directly in `Artifact` as the primary source of tr
 Store:
 
 * Custom score settings
-* Unwanted skill config
 * Optional evaluator version
 
 Calculate:
@@ -301,31 +270,23 @@ Phase 1 UI should avoid formula editing.
 Recommended UI sections:
 
 1. Ideal skill composition editor
-2. Skill priority editor
-3. Unwanted skill editor
-4. Score preview
-5. Score explanation
+2. Skill score editor
+3. Score preview
+4. Score explanation
 
 ### Ideal Skill Composition Editor
 
-* Select up to 4 skills.
-* Slot order is not relevant.
+* Add, edit, and delete multiple ideal configurations.
+* Select multiple attributes and weapon kinds; new configurations select all by default.
+* Select two unordered skills for slots 1 and 2, plus one skill each for slots 3 and 4.
+* Leave a skill unselected to accept any skill in that slot.
 * Display current match count in explanations.
 
-### Skill Priority Editor
+### Skill Score Editor
 
-Preferred UX:
-
-* Drag and drop
-* Or explicit up/down buttons
-
-Avoid requiring users to input numeric weights at first.
-
-### Unwanted Skill Editor
-
-* Checkbox or multi-select.
-* Global setting.
-* Explain that unwanted skills affect priority route more than ideal route.
+* Switch between slots 1–2, slot 3, and slot 4 with tabs.
+* Show every available skill in the selected group.
+* Adjust each integer score from 0 to 25 with a slider.
 
 ## Future Phases
 

@@ -3,12 +3,15 @@ import type { ArtifactUserReview } from "../domain/artifactUserReview";
 import type { ArtifactPresence, ScanSession } from "../domain/scanSession";
 import {
   type CustomScoreSettings,
+  createSkillScoresFromLegacyPriority,
   DEFAULT_CUSTOM_SCORE_SETTINGS,
   DEFAULT_IDEAL_MATCH_SCORES,
   DEFAULT_UNWANTED_SKILL_CONFIG,
+  migrateLegacyIdealSkillKeys,
   type UnwantedSkillConfig,
   withCustomScoreSettingsDefaults,
 } from "../domain/score/customScoreSettings";
+import type { NormalizedSkillKey } from "../domain/skill/normalizedSkill";
 
 const DATABASE_NAME = "gbf-artifact-manager";
 const DATABASE_VERSION = 4;
@@ -64,9 +67,9 @@ type LegacySelectedScoreProfileRecord = {
 
 type LegacyScoreProfile = {
   id: string;
-  idealSkillKeys: CustomScoreSettings["idealSkillKeys"];
+  idealSkillKeys: NormalizedSkillKey[];
   idealMatchScores?: CustomScoreSettings["idealMatchScores"];
-  skillPriority: CustomScoreSettings["skillPriority"];
+  skillPriority: Array<{ skillKey: NormalizedSkillKey; rank: number }>;
   updatedAt: string;
 };
 
@@ -480,12 +483,16 @@ async function getLegacyCustomScoreSettings(
   }
 
   return {
-    idealSkillKeys: [...selectedProfile.idealSkillKeys],
+    idealSkillConfigurations: migrateLegacyIdealSkillKeys(
+      selectedProfile.idealSkillKeys,
+    ),
     idealMatchScores: {
       ...DEFAULT_IDEAL_MATCH_SCORES,
       ...selectedProfile.idealMatchScores,
     },
-    skillPriority: selectedProfile.skillPriority.map((entry) => ({ ...entry })),
+    skillScores: createSkillScoresFromLegacyPriority(
+      selectedProfile.skillPriority,
+    ),
     updatedAt: selectedProfile.updatedAt,
   };
 }

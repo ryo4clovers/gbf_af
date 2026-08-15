@@ -341,8 +341,7 @@ select option {
 
 .idealSkillEditor,
 .idealMatchScoreEditor,
-.skillPriorityEditor,
-.unwantedSkillEditor {
+.skillScoreEditor {
   display: grid;
   gap: 10px;
   margin-top: 12px;
@@ -354,8 +353,7 @@ select option {
 
 .idealSkillEditor h3,
 .idealMatchScoreEditor h3,
-.skillPriorityEditor h3,
-.unwantedSkillEditor h3 {
+.skillScoreEditor h3 {
   margin: 0;
   color: var(--color-text);
   font-size: 14px;
@@ -363,8 +361,7 @@ select option {
 
 .idealSkillEditor label,
 .idealMatchScoreEditor label,
-.skillPriorityEditor label,
-.unwantedSkillEditor label {
+.skillScoreEditor label {
   display: grid;
   gap: 6px;
   max-width: 280px;
@@ -381,18 +378,181 @@ select option {
   justify-self: start;
 }
 
-.scoreSkillChips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.idealSkillEditor > button {
+  justify-self: start;
 }
 
-.scoreSkillChip {
-  border-color: rgba(64, 111, 156, 0.4);
-  padding: 5px 8px;
-  color: #315f87;
-  font-size: 12px;
-  background: rgba(64, 111, 156, 0.08);
+.idealSkillEditorHeader {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.idealSkillEditorHeader h3 {
+  margin: 0;
+}
+
+.idealSkillEditorActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.idealMatchScoreDialog {
+  box-sizing: border-box;
+  width: min(760px, calc(100vw - 32px));
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  padding: 18px;
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-panel);
+}
+
+.idealMatchScoreDialog::backdrop {
+  background: rgba(20, 31, 43, 0.58);
+  backdrop-filter: blur(3px);
+}
+
+.idealMatchScoreDialogHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 12px;
+}
+
+.idealMatchScoreDialogHeader h3 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 16px;
+}
+
+.idealMatchScoreDialog .idealMatchScoreEditor {
+  margin-top: 0;
+  border-top: 0;
+  padding-top: 14px;
+}
+
+.idealConfigurationTableScroller {
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+.idealConfigurationTable {
+  min-width: 1700px;
+  table-layout: fixed;
+}
+
+.idealConfigurationTable th:nth-child(1) {
+  width: 80px;
+}
+
+.idealConfigurationTable th:nth-child(2) {
+  width: 52px;
+}
+
+.idealConfigurationTable th:nth-child(3) {
+  width: 110px;
+}
+
+.idealConfigurationTable th:nth-child(4) {
+  width: 130px;
+}
+
+.idealConfigurationTable th:nth-child(5),
+.idealConfigurationTable th:nth-child(6) {
+  width: 180px;
+}
+
+.idealConfigurationTable th:nth-child(7) {
+  width: 240px;
+}
+
+.idealConfigurationTable th:nth-child(8) {
+  width: 360px;
+}
+
+.idealConfigurationTable th:nth-child(9) {
+  width: 260px;
+}
+
+.idealConfigurationTable td {
+  vertical-align: middle;
+}
+
+.idealConfigurationTable select {
+  width: 100%;
+}
+
+.idealConfigurationComment {
+  width: 100%;
+}
+
+.idealConfigurationNumber {
+  text-align: center;
+  font-weight: 700;
+}
+
+.idealConditionSelector {
+  margin: 0;
+}
+
+.idealConditionSelector summary {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 7px 8px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.idealConditionOptions {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  border: 0;
+  padding: 0;
+}
+
+.idealSkillEditor .idealConditionOptions label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: none;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.idealConditionOptions input {
+  width: auto;
+  margin: 0;
+}
+
+.idealSkillEditor .idealSkillTableSelect {
+  display: block;
+  max-width: none;
+  min-width: 0;
+}
+
+.visuallyHidden {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .mutedText {
@@ -405,35 +565,56 @@ select option {
   color: var(--color-danger);
 }
 
-.skillPriorityList {
-  display: grid;
+.skillScoreTabs {
+  display: flex;
   gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 8px;
 }
 
-.skillPriorityList li {
-  display: flex;
+.skillScoreTabs button.active {
+  border-color: var(--color-accent);
+  color: var(--color-accent-strong);
+  background: var(--color-surface-raised);
+}
+
+.skillScoreGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.skillScoreEditor .skillScoreSlider {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(110px, 180px) 32px;
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
+  max-width: none;
+  min-width: 0;
   border: 1px solid var(--color-border);
   border-radius: 4px;
-  padding: 8px;
+  padding: 8px 10px;
   background: var(--color-surface-muted);
 }
 
-.skillPriorityActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.skillScoreSlider > span {
+  color: var(--color-text);
+  overflow-wrap: anywhere;
 }
 
-.skillPriorityActions button {
-  padding: 4px 8px;
-  font-size: 12px;
-  white-space: nowrap;
+.skillScoreSlider input[type="range"] {
+  padding: 0;
+}
+
+.skillScoreSlider output {
+  color: var(--color-accent-strong);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.skillScoreEditor > button {
+  justify-self: start;
 }
 
 .summaryCards {
@@ -744,12 +925,6 @@ tbody tr:hover {
   box-shadow: 0 0 12px var(--color-accent);
 }
 
-:root[data-theme="cyber"] .scoreSkillChip {
-  border-color: rgba(167, 123, 255, 0.4);
-  color: #dfd2ff;
-  background: rgba(167, 123, 255, 0.08);
-}
-
 :root[data-theme="cyber"] .summaryCard {
   background: linear-gradient(135deg, rgba(17, 37, 60, 0.92), rgba(7, 18, 34, 0.92));
 }
@@ -823,5 +998,18 @@ tbody tr:hover {
 
   .idealMatchScoreGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .idealSkillEditorHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .idealSkillEditorActions {
+    justify-content: flex-start;
+  }
+
+  .skillScoreGrid {
+    grid-template-columns: 1fr;
   }
 }

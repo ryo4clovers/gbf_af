@@ -336,13 +336,12 @@ extension reload や stale content script に対して復旧できること。
 
 ユーザーが独自の評価軸で artifact を評価できること。
 
-Phase 1 では、自由数式エディタではなく rule/profile based scoring とする。
+Phase 1 では、自由数式エディタではなく rule-based scoring とする。
 
 ユーザー入力:
 
-- 理想スキル構成
-- スキル序列
-- 不要スキル
+- 複数の理想スキル構成（属性・武器種・1～2枠・3枠・4枠）
+- 1～2枠・3枠・4枠ごとの全スキルの点数（0～25）
 
 スコア評価:
 
@@ -358,6 +357,8 @@ finalScore =
 
 理想構成にどれだけ近いかを評価する。
 
+属性と武器種に該当する単一構成を使用し、未選択のスキル枠は一致として扱う。
+
 ```text
 idealRouteScore =
   ideal match score
@@ -367,8 +368,8 @@ idealRouteScore =
 要件:
 
 * 1/4, 2/4, 3/4, 4/4 の4段階で一致判定する
-* スロット位置は見ない
-* 不要スキル減点はこのルートでは重視しない
+* 1～2枠は順不同、3枠と4枠は対応する枠で判定する
+* 未選択枠は一致として扱う
 * 理想構成に含まれるスキルの効果量テーブルを補正する
 
 #### priorityRouteScore
@@ -377,17 +378,15 @@ idealRouteScore =
 
 ```text
 priorityRouteScore =
-  skill priority score
+  sum of per-skill scores
   + table multiplier
-  - unwanted skill penalty
 ```
 
 要件:
 
-* スキル序列の高いスキルほど高く評価する
-* 不要スキルが1つあれば大きく減点する
-* 不要スキルが複数あるほど段階的に減点する
-* 不要スキル設定は Phase 1 では profile ごとに変えない
+* 各枠グループの全スキルへ0～25の整数点を設定する
+* 4枠の基礎点合計は最大100とする
+* 不要スキル情報はスコア計算へ使用しない
 
 #### Effect Table
 
@@ -436,7 +435,6 @@ Score: 64
 Route: priority
 + 通常攻撃ダメージ上限 rank e
 + 自属性攻撃力 rank d
-- 不要スキル 1件
 ```
 
 ## 非機能要件

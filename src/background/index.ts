@@ -14,7 +14,9 @@ import {
   type CustomScoreSettings,
   type UnwantedSkillConfig,
   validateIdealMatchScores,
+  validateSkillScores,
 } from "../domain/score/customScoreSettings";
+import { validateIdealSkillConfigurations } from "../domain/score/idealSkillConfiguration";
 import type {
   ErrorResponse,
   ExtensionMessage,
@@ -1223,33 +1225,40 @@ function validationMessageResponse(message: string): ErrorResponse {
   };
 }
 
-function validateCustomScoreSettings(
-  settings: CustomScoreSettings,
-): string | null {
-  if (settings.idealSkillKeys.length > 4) {
-    return "Ideal skills must contain at most 4 skills.";
+function validateCustomScoreSettings(settings: unknown): string | null {
+  if (typeof settings !== "object" || settings === null) {
+    return "Custom score settings are required.";
   }
 
-  if (!settings.idealSkillKeys.every(isNonEmptyString)) {
-    return "Ideal skill keys must be non-empty strings.";
-  }
-
-  const idealMatchScoreError = validateIdealMatchScores(
-    settings.idealMatchScores,
+  const idealSkillConfigurations = Reflect.get(
+    settings,
+    "idealSkillConfigurations",
   );
+  const idealMatchScores = Reflect.get(settings, "idealMatchScores");
+  const skillScores = Reflect.get(settings, "skillScores");
+  const updatedAt = Reflect.get(settings, "updatedAt");
+  const idealSkillConfigurationError = validateIdealSkillConfigurations(
+    idealSkillConfigurations,
+  );
+
+  if (idealSkillConfigurationError !== null) {
+    return idealSkillConfigurationError;
+  }
+
+  const idealMatchScoreError = validateIdealMatchScores(idealMatchScores);
 
   if (idealMatchScoreError !== null) {
     return idealMatchScoreError;
   }
 
-  for (const entry of settings.skillPriority) {
-    if (!isNonEmptyString(entry.skillKey)) {
-      return "Priority skill keys must be non-empty strings.";
-    }
+  const skillScoreError = validateSkillScores(skillScores);
 
-    if (!Number.isFinite(entry.rank) || entry.rank < 1) {
-      return "Priority ranks must be positive numbers.";
-    }
+  if (skillScoreError !== null) {
+    return skillScoreError;
+  }
+
+  if (!isNonEmptyString(updatedAt)) {
+    return "Custom score settings update time is required.";
   }
 
   return null;

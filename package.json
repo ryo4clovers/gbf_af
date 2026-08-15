@@ -3,7 +3,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "check": "biome check .",
-    "format": "biome format --write ."
+    "format": "biome format --write .",
+    "test": "node scripts/test-score-settings.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.15",

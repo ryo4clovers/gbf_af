@@ -13,7 +13,7 @@ export function createIdealMatchReason(args: {
   };
 }
 
-export function createPrioritySkillReason(args: {
+export function createSkillScoreReason(args: {
   skill: NormalizedArtifactSkill;
   baseScore: number;
   score: number;
@@ -21,7 +21,7 @@ export function createPrioritySkillReason(args: {
   return {
     type: "priority_skill",
     skillKey: args.skill.normalizedKey,
-    label: `${args.skill.rawName} priority base ${args.baseScore}`,
+    label: `${args.skill.rawName} skill score ${args.baseScore}`,
     delta: args.score,
   };
 }
@@ -39,17 +39,6 @@ export function createAppliedTableMultiplierReason(args: {
         ? `${args.skill.rawName} rank unknown`
         : `${args.skill.rawName} rank ${args.skill.tableRank}`,
     delta: roundScore(args.multipliedScore - args.baseScore),
-  };
-}
-
-export function createUnwantedPenaltyReason(args: {
-  count: number;
-  penalty: number;
-}): ScoreReason {
-  return {
-    type: "unwanted_penalty",
-    label: `不要スキル ${args.count}件`,
-    delta: -args.penalty,
   };
 }
 

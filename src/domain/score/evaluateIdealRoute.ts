@@ -1,8 +1,13 @@
+import type { Artifact } from "../artifact";
 import type { NormalizedArtifactSkill } from "../skill/normalizedSkill";
 import {
   type CustomScoreSettings,
   DEFAULT_IDEAL_MATCH_SCORES,
 } from "./customScoreSettings";
+import {
+  doesIdealSkillOptionMatch,
+  type IdealSkillConfiguration,
+} from "./idealSkillConfiguration";
 import {
   createAppliedTableMultiplierReason,
   createIdealMatchReason,
@@ -17,15 +22,22 @@ export type IdealRouteResult = {
 };
 
 export function evaluateIdealRoute(args: {
+  artifact: Artifact;
   skills: NormalizedArtifactSkill[];
   settings: CustomScoreSettings;
 }): IdealRouteResult {
-  const idealSkillKeys = getUniqueSkillKeys(args.settings.idealSkillKeys).slice(
-    0,
-    4,
+  const configuration = args.settings.idealSkillConfigurations.find(
+    (candidate) =>
+      candidate.attributeKeys.some(
+        (attributeKey) => attributeKey === args.artifact.attribute.raw,
+      ) &&
+      candidate.kindKeys.some((kindKey) => kindKey === args.artifact.kind.raw),
   );
-  const matchedSkills = getUniqueMatchedSkills(args.skills, idealSkillKeys);
-  const matchCount = Math.min(matchedSkills.length, 4) as 0 | 1 | 2 | 3 | 4;
+  const matchResult =
+    configuration === undefined
+      ? { matchCount: 0 as const, matchedSkills: [] }
+      : matchIdealSkillConfiguration(args.skills, configuration);
+  const { matchCount, matchedSkills } = matchResult;
   const matchScore = getIdealMatchScore(args.settings, matchCount);
   const reasons: ScoreReason[] = [
     createIdealMatchReason({
@@ -70,31 +82,67 @@ function getIdealMatchScore(
   );
 }
 
-function getUniqueMatchedSkills(
+function matchIdealSkillConfiguration(
   skills: NormalizedArtifactSkill[],
-  idealSkillKeys: string[],
-): NormalizedArtifactSkill[] {
-  const idealSkillKeySet = new Set(idealSkillKeys);
-  const matchedSkillKeys = new Set<string>();
+  configuration: IdealSkillConfiguration,
+): {
+  matchCount: 0 | 1 | 2 | 3 | 4;
+  matchedSkills: NormalizedArtifactSkill[];
+} {
+  let matchCount = 0;
   const matchedSkills: NormalizedArtifactSkill[] = [];
+  const availableFirstSecondSkills = skills.filter(
+    (skill) => skill.slot === 1 || skill.slot === 2,
+  );
 
-  for (const skill of skills) {
-    // Phase 1 treats duplicate ideal skills as one match because slot order is ignored.
-    if (!idealSkillKeySet.has(skill.normalizedKey)) {
+  for (const skillKey of configuration.firstSecondSlotSkillKeys) {
+    if (skillKey === null) {
+      matchCount += 1;
       continue;
     }
 
-    if (matchedSkillKeys.has(skill.normalizedKey)) {
+    const matchedIndex = availableFirstSecondSkills.findIndex((skill) =>
+      doesIdealSkillOptionMatch(skillKey, skill),
+    );
+
+    if (matchedIndex < 0) {
       continue;
     }
 
-    matchedSkillKeys.add(skill.normalizedKey);
-    matchedSkills.push(skill);
+    const matchedSkill = availableFirstSecondSkills[matchedIndex];
+
+    if (matchedSkill !== undefined) {
+      matchCount += 1;
+      matchedSkills.push(matchedSkill);
+      availableFirstSecondSkills.splice(matchedIndex, 1);
+    }
   }
 
-  return matchedSkills;
-}
+  const thirdSlotSkill = skills.find((skill) => skill.slot === 3);
+  const fourthSlotSkill = skills.find((skill) => skill.slot === 4);
 
-function getUniqueSkillKeys(skillKeys: string[]): string[] {
-  return Array.from(new Set(skillKeys));
+  if (configuration.thirdSlotSkillKey === null) {
+    matchCount += 1;
+  } else if (
+    thirdSlotSkill !== undefined &&
+    doesIdealSkillOptionMatch(configuration.thirdSlotSkillKey, thirdSlotSkill)
+  ) {
+    matchCount += 1;
+    matchedSkills.push(thirdSlotSkill);
+  }
+
+  if (configuration.fourthSlotSkillKey === null) {
+    matchCount += 1;
+  } else if (
+    fourthSlotSkill !== undefined &&
+    doesIdealSkillOptionMatch(configuration.fourthSlotSkillKey, fourthSlotSkill)
+  ) {
+    matchCount += 1;
+    matchedSkills.push(fourthSlotSkill);
+  }
+
+  return {
+    matchCount: Math.min(matchCount, 4) as 0 | 1 | 2 | 3 | 4,
+    matchedSkills,
+  };
 }

@@ -1,17 +1,18 @@
 import type { NormalizedArtifactSkill } from "../skill/normalizedSkill";
 import type {
   CustomScoreSettings,
-  UnwantedSkillConfig,
+  SkillScoreEntry,
 } from "./customScoreSettings";
 import {
-  PRIORITY_BASE_SCORE,
-  PRIORITY_BASE_SCORE_FALLBACK,
-  UNWANTED_SKILL_PENALTY,
-} from "./scoreConstants";
+  doesIdealSkillOptionMatch,
+  IDEAL_FIRST_SECOND_SLOT_OPTIONS,
+  IDEAL_FOURTH_SLOT_OPTIONS,
+  IDEAL_THIRD_SLOT_OPTIONS,
+  type IdealSkillOption,
+} from "./idealSkillConfiguration";
 import {
   createAppliedTableMultiplierReason,
-  createPrioritySkillReason,
-  createUnwantedPenaltyReason,
+  createSkillScoreReason,
   getTableRankMultiplier,
   roundScore,
 } from "./scoreExplanation";
@@ -25,26 +26,16 @@ export type PriorityRouteResult = {
 export function evaluatePriorityRoute(args: {
   skills: NormalizedArtifactSkill[];
   settings: CustomScoreSettings;
-  unwantedSkillConfig: UnwantedSkillConfig;
 }): PriorityRouteResult {
-  const priorityRankBySkillKey = createPriorityRankMap(
-    args.settings.skillPriority,
-  );
   const reasons: ScoreReason[] = [];
   let score = 0;
 
   for (const skill of args.skills) {
-    const priorityRank = priorityRankBySkillKey.get(skill.normalizedKey);
-
-    if (priorityRank === undefined) {
-      continue;
-    }
-
-    const baseScore = getPriorityBaseScore(priorityRank);
+    const baseScore = getConfiguredSkillScore(skill, args.settings);
     const multipliedScore = baseScore * getTableRankMultiplier(skill);
 
     reasons.push(
-      createPrioritySkillReason({
+      createSkillScoreReason({
         skill,
         baseScore,
         score: baseScore,
@@ -61,75 +52,50 @@ export function evaluatePriorityRoute(args: {
     score += multipliedScore;
   }
 
-  const unwantedSkillCount = countUnwantedSkills(
-    args.skills,
-    args.unwantedSkillConfig.skillKeys,
-  );
-  const unwantedPenalty = getUnwantedSkillPenalty(unwantedSkillCount);
-
-  if (unwantedPenalty > 0) {
-    reasons.push(
-      createUnwantedPenaltyReason({
-        count: unwantedSkillCount,
-        penalty: unwantedPenalty,
-      }),
-    );
-  }
-
   return {
-    score: roundScore(score - unwantedPenalty),
+    score: roundScore(score),
     reasons,
   };
 }
 
-function createPriorityRankMap(
-  entries: CustomScoreSettings["skillPriority"],
-): Map<string, number> {
-  const priorityRankBySkillKey = new Map<string, number>();
+function getConfiguredSkillScore(
+  skill: NormalizedArtifactSkill,
+  settings: CustomScoreSettings,
+): number {
+  const group =
+    skill.slot === 1 || skill.slot === 2
+      ? {
+          entries: settings.skillScores.firstSecondSlot,
+          options: IDEAL_FIRST_SECOND_SLOT_OPTIONS,
+        }
+      : skill.slot === 3
+        ? {
+            entries: settings.skillScores.thirdSlot,
+            options: IDEAL_THIRD_SLOT_OPTIONS,
+          }
+        : {
+            entries: settings.skillScores.fourthSlot,
+            options: IDEAL_FOURTH_SLOT_OPTIONS,
+          };
+  const matchedOption = findMatchingOption(skill, group.options);
 
-  for (const entry of entries) {
-    const existingRank = priorityRankBySkillKey.get(entry.skillKey);
-
-    if (existingRank === undefined || entry.rank < existingRank) {
-      priorityRankBySkillKey.set(entry.skillKey, entry.rank);
-    }
+  if (matchedOption === undefined) {
+    return 0;
   }
 
-  return priorityRankBySkillKey;
+  return getScoreBySkillKey(group.entries, matchedOption.key);
 }
 
-function getPriorityBaseScore(rank: number): number {
-  if (rank === 1) {
-    return PRIORITY_BASE_SCORE[1];
-  }
-  if (rank === 2) {
-    return PRIORITY_BASE_SCORE[2];
-  }
-  if (rank === 3) {
-    return PRIORITY_BASE_SCORE[3];
-  }
-  if (rank === 4) {
-    return PRIORITY_BASE_SCORE[4];
-  }
-  if (rank === 5) {
-    return PRIORITY_BASE_SCORE[5];
-  }
-
-  return PRIORITY_BASE_SCORE_FALLBACK;
+function findMatchingOption(
+  skill: NormalizedArtifactSkill,
+  options: readonly IdealSkillOption[],
+): IdealSkillOption | undefined {
+  return options.find((option) => doesIdealSkillOptionMatch(option.key, skill));
 }
 
-function countUnwantedSkills(
-  skills: NormalizedArtifactSkill[],
-  unwantedSkillKeys: string[],
-): 0 | 1 | 2 | 3 | 4 {
-  const unwantedSkillKeySet = new Set(unwantedSkillKeys);
-  const unwantedSkillCount = skills.filter((skill) =>
-    unwantedSkillKeySet.has(skill.normalizedKey),
-  ).length;
-
-  return Math.min(unwantedSkillCount, 4) as 0 | 1 | 2 | 3 | 4;
-}
-
-function getUnwantedSkillPenalty(count: 0 | 1 | 2 | 3 | 4): number {
-  return UNWANTED_SKILL_PENALTY[count];
+function getScoreBySkillKey(
+  entries: SkillScoreEntry[],
+  skillKey: string,
+): number {
+  return entries.find((entry) => entry.skillKey === skillKey)?.score ?? 0;
 }

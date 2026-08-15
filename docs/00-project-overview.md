@@ -231,20 +231,18 @@ MV3 service worker は常駐しないため、background memory が常に維持�
 
 * 欲しいスキルの組み合わせにどれだけ近いか
 * 使用頻度の高い、または強いスキルを持っているか
-* 不要スキルを持っているか
 * 同じスキルでも効果量テーブルが高いか
 
 ### Phase 1 方針
 
 最初から完全な自由数式エディタは作りません。
 
-Phase 1 では、rule/profile based scoring を実装します。
+Phase 1 では、rule-based scoring を実装します。
 
 ユーザーが設定するもの:
 
 * 理想スキル構成
-* スキル序列
-* 不要スキル
+* 1～2枠・3枠・4枠ごとの全スキルの点数（0～25）
 
 ### Score Evaluation
 
@@ -275,15 +273,7 @@ idealRouteScore =
 * 3/4 match
 * 4/4 match
 
-スロット位置は見ません。
-
-不要スキル減点は、このルートでは重視しません。
-
-理由:
-
-* 理想構成に近いAFは、1スキルを変更できれば十分に価値がある
-* 不要スキルが1個であれば、ゲーム内アイテムで別スキルに変更できる可能性がある
-* そのため、理想構成評価では「どれだけ近いか」を最重視する
+1～2枠は順不同、3枠と4枠は対応する枠で判定し、未選択枠は一致として扱います。
 
 #### priorityRouteScore
 
@@ -291,16 +281,11 @@ idealRouteScore =
 
 ```text
 priorityRouteScore =
-  skill priority score
+  sum of per-skill scores
   + table multiplier
-  - unwanted skill penalty
 ```
 
-不要スキル:
-
-* 1つあれば大きく減点
-* 複数あるほど段階的に減点
-* Phase 1 では profile ごとに変えず、共通設定として扱う
+各枠グループの全スキルへ0～25点を設定し、不要スキル情報は計算へ使用しません。
 
 #### Effect Table Rank
 
@@ -316,7 +301,7 @@ priorityRouteScore =
 例:
 
 ```text
-important skill d: 30 * 1.15 = 34.5
+important skill d: 25 * 1.15 = 28.75
 minor skill e:     10 * 1.25 = 12.5
 ```
 

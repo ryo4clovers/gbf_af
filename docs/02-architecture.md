@@ -541,13 +541,12 @@ Custom Score is the next major feature.
 
 Do not implement it as a free-form formula editor first.
 
-Phase 1 should use rule/profile based scoring.
+Phase 1 should use rule-based scoring.
 
 User-configurable inputs:
 
 * ideal skill composition
-* skill priority order
-* unwanted skills
+* per-skill scores grouped by slots 1–2, slot 3, and slot 4
 
 Evaluation:
 
@@ -572,9 +571,9 @@ idealRouteScore =
 Rules:
 
 * evaluate 1/4, 2/4, 3/4, 4/4 match
-* ignore skill slot position
-* do not let unwanted skill penalty dominate this route
-* value ideal closeness because one unwanted skill may be rerolled in-game
+* match slots 1–2 as an unordered pair
+* match slots 3 and 4 against their corresponding slots
+* count unselected skill slots as wildcard matches
 
 ### priorityRouteScore
 
@@ -582,18 +581,15 @@ Evaluates general skill value.
 
 ```text
 priorityRouteScore =
-  skill priority score
+  sum of per-skill scores
   + table multiplier
-  - unwanted skill penalty
 ```
 
 Rules:
 
-* higher priority skills score higher
-* unwanted skills are penalized
-* one unwanted skill is a large penalty
-* multiple unwanted skills are penalized progressively
-* unwanted skill configuration is global in Phase 1
+* every skill has an integer score from 0 to 25 in its slot group
+* the four base skill scores sum to at most 100
+* unwanted-skill metadata does not affect scoring
 
 ### Effect Table Rank
 

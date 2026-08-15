@@ -188,20 +188,18 @@ extension reload や stale content script に備えて、content bridge は再�
 
 評価観点:
 
-* 欲しいスキルの組み合わせにどれだけ近いか
+* 属性・武器種ごとの理想スキル構成にどれだけ近いか
 * 使用頻度の高い、または強いスキルを持っているか
-* 不要スキルを持っているか
 * 同じスキルでも効果量テーブルが高いか
 
 ### 前提
 
 Phase 1 では、完全な自由数式エディタは作りません。
 
-まずは、ユーザが以下を設定できる rule/profile based scoring を実装します。
+まずは、ユーザが以下を設定できる rule-based scoring を実装します。
 
-* 理想スキル構成
-* スキル序列
-* 不要スキル
+* 複数の理想スキル構成（属性・武器種・枠別スキル）
+* 1～2枠・3枠・4枠ごとの全スキルの点数（0～25）
 
 ### スコア評価方針
 
@@ -232,13 +230,7 @@ idealRouteScore =
 * 3/4 一致
 * 4/4 一致
 
-スロット位置は見ません。
-
-理由:
-
-* ユーザは「第何スキルにあるか」よりも、欲しい構成に近いかを重視する
-* 不要スキルが1個であれば、ゲーム内アイテムで別スキルに変更可能
-* そのため、理想構成評価では不要スキル減点を重く扱わない
+1～2枠は順不同、3枠と4枠はそれぞれ対応する枠で判定します。未選択枠は一致として扱います。
 
 #### priorityRouteScore
 
@@ -246,16 +238,11 @@ idealRouteScore =
 
 ```text
 priorityRouteScore =
-  スキル序列スコア
+  枠別スキルスコアの合計
   + 効果量補正
-  - 不要スキル減点
 ```
 
-不要スキル:
-
-* 1つあれば大きく減点
-* 複数あるほど段階的に減点
-* profile ごとには変えず、共通設定として扱う
+各枠の全スキルへ0～25点を設定します。不要スキル情報はスコアへ影響しません。
 
 #### 効果量テーブル補正
 
@@ -270,7 +257,7 @@ priorityRouteScore =
 例:
 
 ```text
-important skill d: 30 * 1.15 = 34.5
+important skill d: 25 * 1.15 = 28.75
 minor skill e:     10 * 1.25 = 12.5
 ```
 
@@ -286,8 +273,7 @@ minor skill e:     10 * 1.25 = 12.5
 
 * rule-based scoring
 * ideal skill set
-* skill priority
-* unwanted skills
+* per-skill scores by slot group
 * table rank multiplier
 * score explanation
 

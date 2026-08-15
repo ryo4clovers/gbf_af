@@ -631,65 +631,61 @@ Phase 1 では profile 数を絞ってもよい。
 
 仕様:
 
-* 最大4スキル
-* slot position は見ない
-* normalized skill key ベースで選択する
+* 複数の理想構成を追加・編集・削除できる
+* 属性と武器種は複数選択とし、新規構成では全選択にする
+* 1～2枠は順不同の2項目、3枠と4枠はそれぞれ専用の選択肢を表示する
+* 未選択のスキル枠はワイルドカードとして一致扱いにする
+* 構成同士の属性×武器種の適用範囲は重複させない
+* 1構成をテーブルの1行で表示し、削除操作は左端、コメント入力は右端に置く
 * 1/4, 2/4, 3/4, 4/4 match の説明を表示する
 
 UI候補:
 
 ```text
-Ideal Skill Composition
-├─ Skill Select 1
-├─ Skill Select 2
-├─ Skill Select 3
-└─ Skill Select 4
-```
-
-または:
-
-```text
-Ideal Skill Composition
-├─ Selected Skill Chips
-└─ Add Skill
+Ideal Skill Configurations
+└─ Configuration
+   ├─ Delete
+   ├─ Attribute Multi-select
+   ├─ Weapon Kind Multi-select
+   ├─ Slot 1–2 Select × 2
+   ├─ Slot 3 Select
+   ├─ Slot 4 Select
+   └─ Comment
 ```
 
 注意:
 
-* slot番号を強調しない
-* 「順番は評価に影響しない」と明示するとよい
+* 1～2枠だけは順番が評価に影響しない
+* 未選択は「どのスキルでも一致」と明示する
 
-### Skill Priority Editor
+### Skill Score Editor
 
 目的:
 
-強い / 使用頻度が高いスキルの序列を設定する。
+強い / 使用頻度が高いスキルへ枠グループ別の点数を設定する。
 
-UI候補:
+仕様:
 
-* drag and drop
-* up / down buttons
-* rank number display
-
-初期実装では、drag and drop より up / down buttons の方が実装・デバッグしやすい。
+* 「1～2枠」「3枠」「4枠」をタブで切り替える
+* 選択中の枠グループに属する全スキルを表示する
+* 各スキルを0～25の整数スライダーで調整する
+* 4枠の基礎点合計は最大100とする
 
 表示例:
 
 ```text
-Skill Priority
-1. 通常攻撃ダメージ上限
-2. 自属性攻撃力
-3. トリプルアタック確率
-4. 攻撃力
+Skill Scores
+[1～2枠] [3枠] [4枠]
+攻撃力              [---------●] 20
+HP                  [------●---] 15
 ```
 
 方針:
 
-* ユーザーに直接点数入力を要求しない
-* rank から内部 score weight を計算する
-* 将来、advanced mode で数値調整を追加してもよい
+* スライダー値を数値でも併記する
+* 保存時に全スキルの値をまとめて永続化する
 
-### Unwanted Skill Editor
+### Future Unwanted Skill Highlight Settings
 
 目的:
 
@@ -697,10 +693,9 @@ Skill Priority
 
 仕様:
 
-* Phase 1 では global config
-* profile ごとには変えない
-* priority route で減点に使う
-* ideal route では重視しすぎない
+* custom score の加点・減点には使用しない
+* 将来のartifact一覧の強調表示に利用する
+* 現在のスコア設定画面には表示しない
 
 UI候補:
 
@@ -711,8 +706,7 @@ UI候補:
 説明文の例:
 
 ```text
-不要スキルは、単体スキル評価ルートで減点されます。
-理想構成に近いAFは、不要スキルが1つあっても高評価になる場合があります。
+不要スキルはスコアへ影響しません。将来の一覧表示で強調するための情報です。
 ```
 
 ### Score Preview
@@ -756,9 +750,8 @@ Priority Route: 61
 または:
 
 ```text
++ 通常攻撃ダメージ上限 skill score 25
 + 通常攻撃ダメージ上限 rank e
-+ 自属性攻撃力 rank d
-- 不要スキル 1件
 ```
 
 方針:
@@ -838,7 +831,7 @@ Start display mode and open an artifact page in GBF.
 
 ```text
 Custom score settings could not be loaded.
-Create a profile by selecting ideal skills, skill priority, and unwanted skills.
+Configure ideal skills and per-skill scores.
 ```
 
 ## Error Display
@@ -973,8 +966,7 @@ src/dashboard/
 src/dashboard/score/
   ScoreSettingsEditor.tsx
   IdealSkillCompositionEditor.tsx
-  SkillPriorityEditor.tsx
-  UnwantedSkillEditor.tsx
+  SkillScoreEditor.tsx
   ScorePreview.tsx
   ScoreExplanation.tsx
 ```

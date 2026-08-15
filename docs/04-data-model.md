@@ -920,23 +920,39 @@ Phase 1 では、自由数式エディタではなく rule/profile based scoring
 
 ```ts
 type CustomScoreSettings = {
-  idealSkillKeys: NormalizedSkillKey[];
+  idealSkillConfigurations: IdealSkillConfiguration[];
   idealMatchScores: IdealMatchScores;
-  skillPriority: SkillPriorityEntry[];
+  skillScores: SkillScores;
   updatedAt: string;
+};
+
+type IdealSkillConfiguration = {
+  id: string;
+  comment: string;
+  attributeKeys: string[];
+  kindKeys: string[];
+  firstSecondSlotSkillKeys: [NormalizedSkillKey | null, NormalizedSkillKey | null];
+  thirdSlotSkillKey: NormalizedSkillKey | null;
+  fourthSlotSkillKey: NormalizedSkillKey | null;
 };
 ```
 
 ```ts
-type SkillPriorityEntry = {
+type SkillScoreEntry = {
   skillKey: NormalizedSkillKey;
-  rank: number;
+  score: number;
+};
+
+type SkillScores = {
+  firstSecondSlot: SkillScoreEntry[];
+  thirdSlot: SkillScoreEntry[];
+  fourthSlot: SkillScoreEntry[];
 };
 ```
 
 ### UnwantedSkillConfig
 
-Phase 1 では profile ごとに変えず、global config とする。
+将来のUI強調表示用データとして保持できるが、custom score の加点・減点には使用しない。
 
 ```ts
 type UnwantedSkillConfig = {
@@ -964,8 +980,7 @@ type ScoreReason = {
   type:
     | "ideal_match"
     | "priority_skill"
-    | "table_multiplier"
-    | "unwanted_penalty";
+    | "table_multiplier";
   skillKey?: NormalizedSkillKey;
   label: string;
   delta: number;
@@ -977,12 +992,11 @@ type ScoreReason = {
 初期候補。
 
 ```ts
-const IDEAL_MATCH_SCORE = {
-  0: 0,
-  1: 20,
-  2: 45,
+const DEFAULT_IDEAL_MATCH_SCORES = {
+  1: 0,
+  2: 0,
   3: 75,
-  4: 110,
+  4: 100,
 } as const;
 ```
 
@@ -993,16 +1007,6 @@ const TABLE_RANK_MULTIPLIER = {
   c: 1.1,
   d: 1.15,
   e: 1.25,
-} as const;
-```
-
-```ts
-const UNWANTED_SKILL_PENALTY = {
-  0: 0,
-  1: 25,
-  2: 60,
-  3: 100,
-  4: 150,
 } as const;
 ```
 
@@ -1093,25 +1097,23 @@ idealRouteScore =
 仕様:
 
 * 1/4, 2/4, 3/4, 4/4 で一致判定
-* slot position は見ない
-* unwanted skill penalty を重視しない
+* 1～2枠は順不同、3枠と4枠は対応する枠で判定
+* 未選択枠は一致として扱う
 * 理想構成に近いかを最重要視する
 
 ### Priority Route
 
 ```text
 priorityRouteScore =
-  skill priority score
+  sum of per-skill scores
   + table multiplier
-  - unwanted skill penalty
 ```
 
 仕様:
 
-* skill priority の高いスキルほど高評価
-* unwanted skill は減点
-* 1つで大きく減点
-* 複数で段階的に減点
+* 各枠グループの全スキルへ0～25点を設定
+* 4枠の基礎点合計は最大100
+* unwanted skill metadata はスコアへ影響しない
 
 ## Data Ownership Rules
 
@@ -1214,9 +1216,8 @@ Custom Score 実装時に `Artifact.customScore` が既に存在する場合で�
 * rating
 * memo
 * custom score settings
-* ideal skill keys
-* skill priority
-* unwanted skills
+* ideal skill configurations
+* per-skill scores for every slot group
 
 方針:
 
@@ -1224,8 +1225,8 @@ Custom Score 実装時に `Artifact.customScore` が既に存在する場合で�
 * memo は string
 * ideal match scores は 0 から 100 の整数で単調増加にする
 * skill keys は known catalog または fallback key
-* ideal skill composition は最大4つ
-* duplicate skill key の扱いは UI / evaluator で明確にする
+* skill scores は全選択肢を含む0から25の整数にする
+* ideal skill configuration の属性×武器種範囲は重複させない
 
 ## Naming Guidelines
 
