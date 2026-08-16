@@ -22,7 +22,7 @@ Granblue Fantasy のアーティファクト(AF)管理を目的とした Chrome 
 - GBF ページ自身が発行した `/rest/artifact/list/{page}` のレスポンスを観測する
 - 観測したレスポンスを content bridge 経由で background service worker に渡す
 - 正規化したアーティファクト情報を IndexedDB に保存する
-- ローカルデータを Side Panel / Dashboard で表示、検索、並び替え、CSV出力・移行する
+- ローカルデータを Side Panel / Dashboard で表示、検索、並び替え、JSON出力・移行する
 - ユーザが付与した rating / memo / custom score settings をローカル保存する
 
 ## 現在の構成
@@ -58,7 +58,7 @@ Popup は現在使用していません。
 - アーティファクト一覧
 - フィルタ
 - ソート
-- CSV export and import for local data migration
+- Versioned JSON export and import for local artifact data migration
 - statistics summary
 - rating
 - memo
@@ -190,7 +190,9 @@ Phase 1 では、完全な自由数式エディタは作りません。
 
 ### スコア評価方針
 
-最終スコアは、次の2つの評価ルートのうち高い方を採用します。
+`is_quirk: true` のクァーキーアーティファクトは、他の判定や減点を行わず最終スコアを `100` とします。
+
+通常のアーティファクトは、次の2つの評価ルートのうち高い方を採用します。
 
 ```text
 finalScore =
@@ -236,9 +238,9 @@ priorityRouteScore =
 
 基本方針:
 
-* A の減点を最も小さく、E の減点を最も大きくする
-* `A <= B <= C <= D <= E` の順序を維持する
-* 減点幅は0～25でユーザーが調整し、`A ≦ B ≦ C ≦ D ≦ E`を維持する
+* A は減点`0`で固定し、E の減点を最も大きくする
+* `A(0) <= B <= C <= D <= E` の順序を維持する
+* B～Eの減点幅は0～25でユーザーが調整し、`A(0) ≦ B ≦ C ≦ D ≦ E`を維持する
 * 初期値は`0 / 1 / 2 / 3 / 4`とし、各ルートのスコアは0未満にしない
 
 例:

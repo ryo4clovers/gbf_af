@@ -1,9 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import {
-  convertArtifactRowsToCsv,
-  parseArtifactRowsFromCsv,
-} from "../csv/artifactCsv";
 import type { Artifact } from "../domain/artifact";
 import type {
   ArtifactUserRating,
@@ -35,18 +31,31 @@ import {
 } from "../domain/score/idealSkillConfiguration";
 import type { ScoreReason, ScoreResult } from "../domain/score/scoreResult";
 import { inferTableRank } from "../domain/skill/inferTableRank";
+import type { NormalizedSkillKey } from "../domain/skill/normalizedSkill";
+import { normalizeArtifactSkill } from "../domain/skill/normalizeSkill";
+import {
+  DEFAULT_SKILL_HIGHLIGHT_COLOR,
+  normalizeSkillHighlightSettings,
+  type SkillHighlightSettings,
+} from "../domain/skill/skillHighlightSettings";
+import { createArtifactJson, parseArtifactJson } from "../json/artifactJson";
 import { sendRuntimeMessage } from "../shared/chromeMessages";
 import { useAppStore } from "../state/appState";
 import {
   type ArtifactStatistics,
   calculateArtifactStatistics,
 } from "../statistics/artifactStatistics";
+import {
+  type ArtifactFilters,
+  createDefaultArtifactFilters,
+  type EquippedFilter,
+  type LifecycleFilter,
+  type LockedFilter,
+  matchesArtifactFilters,
+  type SkillFilterCondition,
+} from "./artifactFilters";
 import "./style.css";
 
-type LockedFilter = "all" | "locked" | "unlocked";
-type EquippedFilter = "all" | "equipped" | "unequipped";
-type RatingFilter = "all" | "unrated" | "1" | "2" | "3" | "4" | "5";
-type LifecycleFilter = "all" | "active" | "possiblyDeleted";
 type SortKey =
   | "totalScore"
   | "ownedId"
@@ -63,6 +72,7 @@ type DashboardIconName =
   | "download"
   | "filter"
   | "help"
+  | "highlight"
   | "list"
   | "refresh"
   | "save"
@@ -79,6 +89,8 @@ const DASHBOARD_ICON_PATHS: Record<DashboardIconName, string> = {
   download: "M19 9h-4V3H9v6H5l7 7 7-7ZM5 18v2h14v-2H5Z",
   filter: "M10 18h4v-2h-4v2ZM3 6v2h18V6H3Zm3 7h12v-2H6v2Z",
   help: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 17h-2v-2h2v2Zm2.07-7.25-.9.92A3.49 3.49 0 0 0 13 15h-2v-.5c0-.8.32-1.57.88-2.12l1.24-1.26A1.71 1.71 0 0 0 13.5 9 1.5 1.5 0 0 0 12 7.5 1.5 1.5 0 0 0 10.5 9h-2a3.5 3.5 0 1 1 6.57 2.75Z",
+  highlight:
+    "m17.5 2.5 4 4-10 10-5 1 1-5 10-10Zm-11 13 4.15-.83 8.02-8.02-1.32-1.32-8.02 8.02L8.5 17.5l-2-2ZM3 20h18v2H3v-2Z",
   list: "M3 13h2v-2H3v2Zm0 4h2v-2H3v2Zm0-8h2V7H3v2Zm4 4h14v-2H7v2Zm0 4h14v-2H7v2ZM7 7v2h14V7H7Z",
   refresh:
     "M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h8V3l-3.35 3.35Z",
@@ -90,29 +102,9 @@ const DASHBOARD_ICON_PATHS: Record<DashboardIconName, string> = {
 };
 type DashboardTheme = "fantasy" | "cyber";
 
-type ArtifactFilters = {
-  searchText: string;
-  attribute: string;
-  kind: string;
-  locked: LockedFilter;
-  equipped: EquippedFilter;
-  rating: RatingFilter;
-  lifecycle: LifecycleFilter;
-};
-
 type ArtifactSort = {
   key: SortKey;
   direction: SortDirection;
-};
-
-const initialFilters: ArtifactFilters = {
-  searchText: "",
-  attribute: "all",
-  kind: "all",
-  locked: "all",
-  equipped: "all",
-  rating: "all",
-  lifecycle: "all",
 };
 
 type ReviewedArtifactRow = {
@@ -123,6 +115,7 @@ type ReviewedArtifactRow = {
 };
 
 const DASHBOARD_THEME_STORAGE_KEY = "gbf-af-dashboard-theme";
+const SKILL_HIGHLIGHT_STORAGE_KEY = "gbf-af-skill-highlights";
 const DASHBOARD_TABS: DashboardTab[] = ["list", "scoreSettings", "statistics"];
 const DASHBOARD_TAB_IDS: Record<DashboardTab, string> = {
   list: "dashboard-tab-list",
@@ -183,6 +176,19 @@ function getInitialDashboardTheme(): DashboardTheme {
     : "fantasy";
 }
 
+function getInitialSkillHighlightSettings(): SkillHighlightSettings {
+  try {
+    const savedSettings = window.localStorage.getItem(
+      SKILL_HIGHLIGHT_STORAGE_KEY,
+    );
+    return savedSettings === null
+      ? {}
+      : normalizeSkillHighlightSettings(JSON.parse(savedSettings));
+  } catch {
+    return {};
+  }
+}
+
 function Dashboard() {
   const { scan, setScanState } = useAppStore();
   const [dashboardTheme, setDashboardTheme] = useState<DashboardTheme>(
@@ -212,7 +218,9 @@ function Dashboard() {
   >(null);
   const [isScoreSettingsSaving, setIsScoreSettingsSaving] = useState(false);
   const scoreSettingsSaveInFlightRef = useRef(false);
-  const [filters, setFilters] = useState<ArtifactFilters>(initialFilters);
+  const [filters, setFilters] = useState<ArtifactFilters>(
+    createDefaultArtifactFilters,
+  );
   const [sort, setSort] = useState<ArtifactSort>({
     key: "totalScore",
     direction: "desc",
@@ -222,6 +230,12 @@ function Dashboard() {
   const [activeDashboardTab, setActiveDashboardTab] =
     useState<DashboardTab>("list");
   const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
+  const [isHighlightDialogOpen, setIsHighlightDialogOpen] = useState(false);
+  const [highlightSettingsError, setHighlightSettingsError] = useState<
+    string | null
+  >(null);
+  const [skillHighlightSettings, setSkillHighlightSettings] =
+    useState<SkillHighlightSettings>(getInitialSkillHighlightSettings);
   const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false);
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const importFileInputRef = useRef<HTMLInputElement>(null);
@@ -243,8 +257,6 @@ function Dashboard() {
     filters,
     sort,
   );
-  const attributeOptions = getAttributeOptions(artifacts);
-  const kindOptions = getKindOptions(artifacts);
 
   useEffect(() => {
     document.documentElement.dataset.theme = dashboardTheme;
@@ -328,28 +340,35 @@ function Dashboard() {
     loadArtifacts();
   }, [loadArtifacts]);
 
-  const exportCsv = () => {
+  const exportJson = () => {
     if (filteredRows.length === 0) {
       setStatusMessage("No artifacts match the current filters.");
       return;
     }
 
-    downloadCsvFile(
-      convertArtifactRowsToCsv(
-        filteredRows.map((row) => ({
-          artifact: row.artifact,
-          review: row.review ?? undefined,
-          presence: row.presence ?? undefined,
-        })),
+    const exportedAt = new Date();
+    downloadJsonFile(
+      createArtifactJson(
+        {
+          artifacts: filteredRows.map((row) => row.artifact),
+          reviews: filteredRows.flatMap((row) =>
+            row.review === null ? [] : [row.review],
+          ),
+          presence: filteredRows.flatMap((row) =>
+            row.presence === null ? [] : [row.presence],
+          ),
+        },
+        exportedAt.toISOString(),
       ),
-      createArtifactCsvFileName(new Date()),
+      createArtifactJsonFileName(exportedAt),
     );
     setStatusMessage(`Exported ${filteredRows.length} artifacts.`);
   };
 
-  const importCsv = async (file: File) => {
+  const importArtifactData = async (file: File) => {
     try {
-      const imported = parseArtifactRowsFromCsv(await file.text());
+      const text = await file.text();
+      const imported = parseArtifactJson(text);
       if (imported.artifacts.length === 0) {
         setStatusMessage("インポート対象のアーティファクトがありません。");
         return;
@@ -371,8 +390,8 @@ function Dashboard() {
     } catch (error) {
       setStatusMessage(
         error instanceof Error
-          ? `CSVをインポートできませんでした: ${error.message}`
-          : "CSVをインポートできませんでした。",
+          ? `データをインポートできませんでした: ${error.message}`
+          : "データをインポートできませんでした。",
       );
     } finally {
       if (importFileInputRef.current !== null) {
@@ -736,6 +755,16 @@ function Dashboard() {
                     <DashboardIcon name="filter" />
                     絞り込み
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHighlightSettingsError(null);
+                      setIsHighlightDialogOpen(true);
+                    }}
+                  >
+                    <DashboardIcon name="highlight" />
+                    強調表示
+                  </button>
                   <div className="sortControl">
                     <DashboardIcon name="sort" />
                     <span className="visuallyHidden">並び替え</span>
@@ -750,10 +779,10 @@ function Dashboard() {
                     ref={importFileInputRef}
                     className="visuallyHidden"
                     type="file"
-                    accept=".csv,text/csv"
+                    accept=".json,application/json"
                     onChange={(event) => {
                       const file = event.currentTarget.files?.[0];
-                      if (file !== undefined) void importCsv(file);
+                      if (file !== undefined) void importArtifactData(file);
                     }}
                   />
                   <button
@@ -761,15 +790,15 @@ function Dashboard() {
                     onClick={() => importFileInputRef.current?.click()}
                   >
                     <DashboardIcon name="upload" />
-                    import
+                    インポート
                   </button>
                   <button
                     type="button"
-                    onClick={exportCsv}
+                    onClick={exportJson}
                     disabled={filteredRows.length === 0}
                   >
                     <DashboardIcon name="download" />
-                    export
+                    エクスポート
                   </button>
                   <button
                     className="dangerButton"
@@ -801,6 +830,7 @@ function Dashboard() {
                 </p>
               ) : (
                 <ArtifactTable
+                  skillHighlightSettings={skillHighlightSettings}
                   rows={filteredRows}
                   onMemoBlur={(row) =>
                     saveReview(
@@ -877,20 +907,42 @@ function Dashboard() {
           title="絞り込み"
           onClose={() => setIsFilterDialogOpen(false)}
         >
-          <ArtifactControls
-            attributeOptions={attributeOptions}
+          <ArtifactFilterEditor
             filters={filters}
-            kindOptions={kindOptions}
-            onFiltersChange={setFilters}
+            onCancel={() => setIsFilterDialogOpen(false)}
+            onApply={(nextFilters) => {
+              setFilters(nextFilters);
+              setIsFilterDialogOpen(false);
+            }}
           />
-          <div className="dialogActions">
-            <button type="button" onClick={() => setFilters(initialFilters)}>
-              デフォルト
-            </button>
-            <button type="button" onClick={() => setIsFilterDialogOpen(false)}>
-              適用
-            </button>
-          </div>
+        </DashboardDialog>
+      )}
+
+      {isHighlightDialogOpen && (
+        <DashboardDialog
+          title="スキルの強調表示"
+          onClose={() => setIsHighlightDialogOpen(false)}
+        >
+          <SkillHighlightEditor
+            errorMessage={highlightSettingsError}
+            settings={skillHighlightSettings}
+            onCancel={() => setIsHighlightDialogOpen(false)}
+            onSave={(settings) => {
+              try {
+                window.localStorage.setItem(
+                  SKILL_HIGHLIGHT_STORAGE_KEY,
+                  JSON.stringify(settings),
+                );
+                setSkillHighlightSettings(settings);
+                setHighlightSettingsError(null);
+                setIsHighlightDialogOpen(false);
+              } catch {
+                setHighlightSettingsError(
+                  "強調表示の設定を保存できませんでした。",
+                );
+              }
+            }}
+          />
         </DashboardDialog>
       )}
 
@@ -1573,8 +1625,8 @@ function TableRankPenaltySettings({
           </button>
         </div>
         <p className="mutedText">
-          各スキルの基礎点から減算します。スコアは0未満になりません。A ≦ B ≦ C ≦
-          D ≦ Eの順で設定してください。
+          Aは減点なしです。B～Eは各スキルの基礎点から減算し、スコアは0未満になりません。A
+          ≦ B ≦ C ≦ D ≦ Eの順で設定してください。
         </p>
         <div className="tableRankPenaltyGrid">
           {TABLE_RANKS.map((rank) => (
@@ -1585,7 +1637,7 @@ function TableRankPenaltySettings({
                 min={0}
                 max={25}
                 step={1}
-                disabled={isSaving}
+                disabled={isSaving || rank === "a"}
                 value={draftPenalties[rank]}
                 onChange={(event) =>
                   setDraftPenalties((current) => ({
@@ -1594,7 +1646,7 @@ function TableRankPenaltySettings({
                   }))
                 }
               />
-              <output>{draftPenalties[rank]}</output>
+              <output>{rank === "a" ? 0 : draftPenalties[rank]}</output>
             </label>
           ))}
         </div>
@@ -1921,148 +1973,429 @@ function SkillStatisticsTable({
   );
 }
 
-function ArtifactControls({
-  attributeOptions,
+type FilterSkillGroup = "firstSecondSlot" | "thirdSlot" | "fourthSlot";
+
+const FILTER_SKILL_GROUPS: ReadonlyArray<{
+  key: FilterSkillGroup;
+  conditionKey: keyof SkillFilterCondition;
+  label: string;
+  options: readonly IdealSkillOption[];
+}> = [
+  {
+    key: "firstSecondSlot",
+    conditionKey: "firstSecondSlotKeys",
+    label: "枠1～2",
+    options: IDEAL_FIRST_SECOND_SLOT_OPTIONS,
+  },
+  {
+    key: "thirdSlot",
+    conditionKey: "thirdSlotKeys",
+    label: "枠3",
+    options: IDEAL_THIRD_SLOT_OPTIONS,
+  },
+  {
+    key: "fourthSlot",
+    conditionKey: "fourthSlotKeys",
+    label: "枠4",
+    options: IDEAL_FOURTH_SLOT_OPTIONS,
+  },
+];
+const FILTER_CONDITION_IDS = [
+  "condition-1",
+  "condition-2",
+  "condition-3",
+] as const;
+
+function ArtifactFilterEditor({
   filters,
-  kindOptions,
-  onFiltersChange,
+  onApply,
+  onCancel,
 }: {
-  attributeOptions: string[];
   filters: ArtifactFilters;
-  kindOptions: string[];
-  onFiltersChange: (filters: ArtifactFilters) => void;
+  onApply: (filters: ArtifactFilters) => void;
+  onCancel: () => void;
 }) {
+  const [draft, setDraft] = useState<ArtifactFilters>(filters);
+  const [activeSkillGroups, setActiveSkillGroups] = useState<
+    [FilterSkillGroup, FilterSkillGroup, FilterSkillGroup]
+  >(["firstSecondSlot", "firstSecondSlot", "firstSecondSlot"]);
+
+  const toggleSelection = (
+    field: "attributeKeys" | "kindKeys",
+    value: string,
+  ) => {
+    setDraft((current) => ({
+      ...current,
+      [field]: current[field].includes(value)
+        ? current[field].filter((candidate) => candidate !== value)
+        : [...current[field], value],
+    }));
+  };
+
+  const updateSkillCondition = (
+    conditionIndex: number,
+    conditionKey: keyof SkillFilterCondition,
+    skillKey: NormalizedSkillKey,
+  ) => {
+    setDraft((current) => {
+      const condition = current.skillConditions[conditionIndex];
+      if (condition === undefined) return current;
+      const selectedKeys = condition[conditionKey];
+      const nextCondition = {
+        ...condition,
+        [conditionKey]: selectedKeys.includes(skillKey)
+          ? selectedKeys.filter((candidate) => candidate !== skillKey)
+          : [...selectedKeys, skillKey],
+      };
+      const [first, second, third] = current.skillConditions;
+      const skillConditions: ArtifactFilters["skillConditions"] =
+        conditionIndex === 0
+          ? [nextCondition, second, third]
+          : conditionIndex === 1
+            ? [first, nextCondition, third]
+            : [first, second, nextCondition];
+      return { ...current, skillConditions };
+    });
+  };
+
   return (
-    <section className="tableControls" aria-label="Artifact filters">
-      <div className="filterGrid">
-        <label>
-          検索
-          <input
-            type="search"
-            value={filters.searchText}
-            onChange={(event) =>
-              onFiltersChange({
-                ...filters,
-                searchText: event.currentTarget.value,
-              })
-            }
-            placeholder="名前、スキル、装備キャラ"
+    <section
+      className="artifactFilterEditor"
+      aria-label="アーティファクトの絞り込み"
+    >
+      <FilterOptionSection title="属性">
+        {ARTIFACT_ATTRIBUTE_OPTIONS.map((option) => (
+          <FilterCheckbox
+            checked={draft.attributeKeys.includes(option.key)}
+            iconPath={`elements/${ATTRIBUTE_ICON_FILE_NAMES[option.key]}`}
+            key={option.key}
+            label={option.label}
+            onChange={() => toggleSelection("attributeKeys", option.key)}
           />
-        </label>
+        ))}
+      </FilterOptionSection>
 
-        <label>
-          属性
-          <select
-            value={filters.attribute}
-            onChange={(event) =>
-              onFiltersChange({
-                ...filters,
-                attribute: event.currentTarget.value,
-              })
-            }
-          >
-            <option value="all">すべて</option>
-            {attributeOptions.map((attribute) => (
-              <option key={attribute} value={attribute}>
-                {attribute}
-              </option>
-            ))}
-          </select>
-        </label>
+      <FilterOptionSection title="武器種">
+        {ARTIFACT_KIND_OPTIONS.map((option) => (
+          <FilterCheckbox
+            checked={draft.kindKeys.includes(option.key)}
+            iconPath={`weapons/${WEAPON_ICON_FILE_NAMES[option.key]}`}
+            key={option.key}
+            label={option.label}
+            onChange={() => toggleSelection("kindKeys", option.key)}
+          />
+        ))}
+      </FilterOptionSection>
 
-        <label>
-          武器種
-          <select
-            value={filters.kind}
-            onChange={(event) =>
-              onFiltersChange({
-                ...filters,
-                kind: event.currentTarget.value,
-              })
-            }
-          >
-            <option value="all">すべて</option>
-            {kindOptions.map((kind) => (
-              <option key={kind} value={kind}>
-                {formatKindLabel(kind)}
-              </option>
-            ))}
-          </select>
-        </label>
+      <DualRangeFilter
+        label="スコア"
+        min={0}
+        max={100}
+        value={draft.scoreRange}
+        onChange={(scoreRange) =>
+          setDraft((current) => ({ ...current, scoreRange }))
+        }
+      />
+      <DualRangeFilter
+        label="評価"
+        min={0}
+        max={5}
+        value={draft.ratingRange}
+        valueFormatter={(value) => (value === 0 ? "未評価" : `★${value}`)}
+        onChange={(ratingRange) =>
+          setDraft((current) => ({ ...current, ratingRange }))
+        }
+      />
 
-        <label>
-          お気に入り(ゲーム内)
-          <select
-            value={filters.locked}
-            onChange={(event) =>
-              onFiltersChange({
-                ...filters,
-                locked: event.currentTarget.value as LockedFilter,
-              })
-            }
-          >
-            <option value="all">すべて</option>
-            <option value="locked">お気に入り</option>
-            <option value="unlocked">お気に入り以外</option>
-          </select>
-        </label>
+      <section className="filterSkillSection">
+        <h3>スキル</h3>
+        {draft.skillConditions.map((condition, conditionIndex) => {
+          const activeGroup =
+            activeSkillGroups[conditionIndex] ?? "firstSecondSlot";
+          const group = FILTER_SKILL_GROUPS.find(
+            (candidate) => candidate.key === activeGroup,
+          );
+          if (group === undefined) return null;
+          const selectedCount = Object.values(condition).flat().length;
 
-        <label>
-          装備状態(ゲーム内)
-          <select
-            value={filters.equipped}
-            onChange={(event) =>
-              onFiltersChange({
-                ...filters,
-                equipped: event.currentTarget.value as EquippedFilter,
-              })
-            }
-          >
-            <option value="all">すべて</option>
-            <option value="equipped">装備中</option>
-            <option value="unequipped">未装備</option>
-          </select>
-        </label>
+          return (
+            <details
+              key={FILTER_CONDITION_IDS[conditionIndex]}
+              open={conditionIndex === 0}
+            >
+              <summary>
+                条件{conditionIndex + 1}
+                {selectedCount > 0 ? `（${selectedCount}件）` : ""}
+              </summary>
+              <div className="filterSkillCondition">
+                <div
+                  className="filterSkillTabs"
+                  role="tablist"
+                  aria-label={`条件${conditionIndex + 1}の枠`}
+                >
+                  {FILTER_SKILL_GROUPS.map((candidate) => (
+                    <button
+                      className={candidate.key === activeGroup ? "active" : ""}
+                      key={candidate.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={candidate.key === activeGroup}
+                      onClick={() =>
+                        setActiveSkillGroups((current) => {
+                          const [first, second, third] = current;
+                          return conditionIndex === 0
+                            ? [candidate.key, second, third]
+                            : conditionIndex === 1
+                              ? [first, candidate.key, third]
+                              : [first, second, candidate.key];
+                        })
+                      }
+                    >
+                      {candidate.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="filterSkillOptions">
+                  {group.options.map((option) => (
+                    <label key={option.key}>
+                      <input
+                        type="checkbox"
+                        checked={condition[group.conditionKey].includes(
+                          option.key,
+                        )}
+                        onChange={() =>
+                          updateSkillCondition(
+                            conditionIndex,
+                            group.conditionKey,
+                            option.key,
+                          )
+                        }
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <p className="filterHint">
+                  この条件内では、選択したスキルのいずれかに一致（OR）
+                </p>
+              </div>
+            </details>
+          );
+        })}
+        <p className="filterHint">
+          条件1～3のうち、設定された条件はすべて一致（AND）
+        </p>
+      </section>
 
-        <label>
-          評価
-          <select
-            value={filters.rating}
-            onChange={(event) =>
-              onFiltersChange({
-                ...filters,
-                rating: event.currentTarget.value as RatingFilter,
-              })
+      <details className="filterOtherConditions">
+        <summary>その他の条件</summary>
+        <div className="filterGrid">
+          <label>
+            検索
+            <input
+              type="search"
+              value={draft.searchText}
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  searchText: event.currentTarget.value,
+                }))
+              }
+              placeholder="名前、スキル、装備キャラ"
+            />
+          </label>
+          <FilterSelect
+            label="お気に入り（ゲーム内）"
+            value={draft.locked}
+            options={[
+              ["all", "すべて"],
+              ["locked", "お気に入り"],
+              ["unlocked", "お気に入り以外"],
+            ]}
+            onChange={(locked) =>
+              setDraft((current) => ({
+                ...current,
+                locked: locked as LockedFilter,
+              }))
             }
-          >
-            <option value="all">すべて</option>
-            <option value="unrated">未評価</option>
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-            <option value="5">5</option>
-          </select>
-        </label>
+          />
+          <FilterSelect
+            label="装備状態（ゲーム内）"
+            value={draft.equipped}
+            options={[
+              ["all", "すべて"],
+              ["equipped", "装備中"],
+              ["unequipped", "未装備"],
+            ]}
+            onChange={(equipped) =>
+              setDraft((current) => ({
+                ...current,
+                equipped: equipped as EquippedFilter,
+              }))
+            }
+          />
+          <FilterSelect
+            label="所持状態"
+            value={draft.lifecycle}
+            options={[
+              ["all", "すべて"],
+              ["active", "所持中"],
+              ["possiblyDeleted", "解体済み?"],
+            ]}
+            onChange={(lifecycle) =>
+              setDraft((current) => ({
+                ...current,
+                lifecycle: lifecycle as LifecycleFilter,
+              }))
+            }
+          />
+        </div>
+      </details>
 
-        <label>
-          所持状態
-          <select
-            value={filters.lifecycle}
-            onChange={(event) =>
-              onFiltersChange({
-                ...filters,
-                lifecycle: event.currentTarget.value as LifecycleFilter,
-              })
-            }
-          >
-            <option value="all">すべて</option>
-            <option value="active">所持中</option>
-            <option value="possiblyDeleted">解体済み?</option>
-          </select>
-        </label>
+      <div className="dialogActions">
+        <button
+          type="button"
+          onClick={() => setDraft(createDefaultArtifactFilters())}
+        >
+          デフォルト
+        </button>
+        <button type="button" onClick={() => onApply(draft)}>
+          適用
+        </button>
+        <button type="button" onClick={onCancel}>
+          キャンセル
+        </button>
       </div>
     </section>
+  );
+}
+
+function FilterOptionSection({
+  children,
+  title,
+}: {
+  children: React.ReactNode;
+  title: string;
+}) {
+  return (
+    <fieldset className="filterOptionSection">
+      <legend>{title}</legend>
+      <div className="filterOptionGrid">{children}</div>
+    </fieldset>
+  );
+}
+
+function FilterCheckbox({
+  checked,
+  iconPath,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  iconPath: string;
+  label: string;
+  onChange: () => void;
+}) {
+  return (
+    <label className="filterIconOption">
+      <input type="checkbox" checked={checked} onChange={onChange} />
+      <img src={chrome.runtime.getURL(iconPath)} alt="" />
+      <span>{label}</span>
+    </label>
+  );
+}
+
+function DualRangeFilter({
+  label,
+  max,
+  min,
+  onChange,
+  value,
+  valueFormatter = String,
+}: {
+  label: string;
+  max: number;
+  min: number;
+  onChange: (value: [number, number]) => void;
+  value: [number, number];
+  valueFormatter?: (value: number) => string;
+}) {
+  const lowerPosition = ((value[0] - min) / (max - min)) * 100;
+  const upperPosition = ((value[1] - min) / (max - min)) * 100;
+
+  return (
+    <section className="dualRangeFilter">
+      <div className="dualRangeHeader">
+        <h3>{label}</h3>
+        <output>
+          {valueFormatter(value[0])}以上 {valueFormatter(value[1])}以下
+        </output>
+      </div>
+      <div className="dualRangeControl">
+        <div className="dualRangeRail" />
+        <div
+          className="dualRangeSelection"
+          style={{
+            left: `${lowerPosition}%`,
+            right: `${100 - upperPosition}%`,
+          }}
+        />
+        <input
+          type="range"
+          aria-label={`${label}の下限`}
+          min={min}
+          max={max}
+          value={value[0]}
+          onChange={(event) =>
+            onChange([
+              Math.min(Number(event.currentTarget.value), value[1]),
+              value[1],
+            ])
+          }
+        />
+        <input
+          type="range"
+          aria-label={`${label}の上限`}
+          min={min}
+          max={max}
+          value={value[1]}
+          onChange={(event) =>
+            onChange([
+              value[0],
+              Math.max(Number(event.currentTarget.value), value[0]),
+            ])
+          }
+        />
+      </div>
+    </section>
+  );
+}
+
+function FilterSelect({
+  label,
+  onChange,
+  options,
+  value,
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  options: ReadonlyArray<readonly [string, string]>;
+  value: string;
+}) {
+  return (
+    <label>
+      {label}
+      <select
+        value={value}
+        onChange={(event) => onChange(event.currentTarget.value)}
+      >
+        {options.map(([optionValue, optionLabel]) => (
+          <option value={optionValue} key={optionValue}>
+            {optionLabel}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -2099,13 +2432,176 @@ function SortSelect({
   );
 }
 
+type SkillHighlightGroup = "firstSecondSlot" | "thirdSlot" | "fourthSlot";
+
+const SKILL_HIGHLIGHT_GROUPS: ReadonlyArray<{
+  key: SkillHighlightGroup;
+  label: string;
+  options: readonly IdealSkillOption[];
+}> = [
+  {
+    key: "firstSecondSlot",
+    label: "1～2枠",
+    options: IDEAL_FIRST_SECOND_SLOT_OPTIONS,
+  },
+  { key: "thirdSlot", label: "3枠", options: IDEAL_THIRD_SLOT_OPTIONS },
+  { key: "fourthSlot", label: "4枠", options: IDEAL_FOURTH_SLOT_OPTIONS },
+];
+
+function SkillHighlightEditor({
+  errorMessage,
+  onCancel,
+  onSave,
+  settings,
+}: {
+  errorMessage: string | null;
+  onCancel: () => void;
+  onSave: (settings: SkillHighlightSettings) => void;
+  settings: SkillHighlightSettings;
+}) {
+  const [activeGroup, setActiveGroup] =
+    useState<SkillHighlightGroup>("firstSecondSlot");
+  const [draftSettings, setDraftSettings] =
+    useState<SkillHighlightSettings>(settings);
+  const activeOptions =
+    SKILL_HIGHLIGHT_GROUPS.find((group) => group.key === activeGroup)
+      ?.options ?? [];
+
+  const handleTabKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    currentGroup: SkillHighlightGroup,
+  ) => {
+    const currentIndex = SKILL_HIGHLIGHT_GROUPS.findIndex(
+      (group) => group.key === currentGroup,
+    );
+    let nextIndex = currentIndex;
+
+    if (event.key === "ArrowRight") nextIndex = currentIndex + 1;
+    else if (event.key === "ArrowLeft") nextIndex = currentIndex - 1;
+    else if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = SKILL_HIGHLIGHT_GROUPS.length - 1;
+    else return;
+
+    event.preventDefault();
+    const nextGroup =
+      SKILL_HIGHLIGHT_GROUPS[
+        (nextIndex + SKILL_HIGHLIGHT_GROUPS.length) %
+          SKILL_HIGHLIGHT_GROUPS.length
+      ];
+    if (nextGroup === undefined) return;
+    setActiveGroup(nextGroup.key);
+    document.getElementById(`skill-highlight-tab-${nextGroup.key}`)?.focus();
+  };
+
+  const updateHighlight = (
+    skillKey: NormalizedSkillKey,
+    color: string | null,
+  ) => {
+    setDraftSettings((current) => {
+      const next = { ...current };
+
+      if (color === null) {
+        delete next[skillKey];
+      } else {
+        next[skillKey] = color;
+      }
+
+      return next;
+    });
+  };
+
+  return (
+    <div className="skillHighlightEditor">
+      <p className="mutedText">
+        強調するスキルを有効にし、スキルごとの背景色を選択してください。
+      </p>
+      {errorMessage !== null && (
+        <p className="errorText" role="alert">
+          {errorMessage}
+        </p>
+      )}
+      <div className="skillHighlightTabs" role="tablist" aria-label="スキル枠">
+        {SKILL_HIGHLIGHT_GROUPS.map((group) => (
+          <button
+            id={`skill-highlight-tab-${group.key}`}
+            className={activeGroup === group.key ? "active" : ""}
+            type="button"
+            role="tab"
+            aria-controls="skill-highlight-panel"
+            aria-selected={activeGroup === group.key}
+            tabIndex={activeGroup === group.key ? 0 : -1}
+            key={group.key}
+            onClick={() => setActiveGroup(group.key)}
+            onKeyDown={(event) => handleTabKeyDown(event, group.key)}
+          >
+            {group.label}
+          </button>
+        ))}
+      </div>
+      <div
+        id="skill-highlight-panel"
+        className="skillHighlightList"
+        role="tabpanel"
+        aria-labelledby={`skill-highlight-tab-${activeGroup}`}
+      >
+        {activeOptions.map((option) => {
+          const color = draftSettings[option.key];
+          const isEnabled = color !== undefined;
+
+          return (
+            <div className="skillHighlightRow" key={option.key}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={isEnabled}
+                  onChange={(event) =>
+                    updateHighlight(
+                      option.key,
+                      event.currentTarget.checked
+                        ? DEFAULT_SKILL_HIGHLIGHT_COLOR
+                        : null,
+                    )
+                  }
+                />
+                <span>{option.label}</span>
+              </label>
+              <input
+                type="color"
+                aria-label={`${option.label}のハイライトカラー`}
+                disabled={!isEnabled}
+                value={color ?? DEFAULT_SKILL_HIGHLIGHT_COLOR}
+                onChange={(event) =>
+                  updateHighlight(option.key, event.currentTarget.value)
+                }
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="dialogActions">
+        <button type="button" onClick={() => setDraftSettings({})}>
+          すべて解除
+        </button>
+        <button type="button" onClick={onCancel}>
+          キャンセル
+        </button>
+        <button type="button" onClick={() => onSave(draftSettings)}>
+          適用
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ArtifactTable({
   rows,
+  skillHighlightSettings,
   onMemoBlur,
   onMemoChange,
   onRatingChange,
 }: {
   rows: ReviewedArtifactRow[];
+  skillHighlightSettings: SkillHighlightSettings;
   onMemoBlur: (row: ReviewedArtifactRow) => void;
   onMemoChange: (ownedId: number, memo: string) => void;
   onRatingChange: (
@@ -2142,12 +2638,34 @@ function ArtifactTable({
                 <td>{artifact.level}</td>
                 <td>
                   <ul className="skillList">
-                    {artifact.skills.map((skill) => (
-                      <li key={skill.slot}>
-                        {formatSkillQuality(skill)}
-                        {skill.name} <small>{skill.effectValueText}</small>
-                      </li>
-                    ))}
+                    {artifact.skills.map((skill) => {
+                      const highlightColor =
+                        skillHighlightSettings[
+                          normalizeArtifactSkill(skill).normalizedKey
+                        ];
+
+                      return (
+                        <li
+                          key={skill.slot}
+                          className={
+                            highlightColor === undefined
+                              ? undefined
+                              : "highlightedSkill"
+                          }
+                          style={{
+                            backgroundColor: highlightColor,
+                            color: getHighlightTextColor(highlightColor),
+                          }}
+                        >
+                          <span className="skillQualityMarker">
+                            {formatDisplayedSkillQuality(skill)}.
+                          </span>
+                          <span>
+                            {skill.name} <small>{skill.effectValueText}</small>
+                          </span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </td>
                 <td>
@@ -2273,81 +2791,15 @@ function matchesFilters(
   row: ReviewedArtifactRow,
   filters: ArtifactFilters,
 ): boolean {
-  const { artifact, review } = row;
-  const searchText = filters.searchText.trim().toLowerCase();
-
-  if (searchText.length > 0 && !matchesSearchText(artifact, searchText)) {
-    return false;
-  }
-
-  if (
-    filters.attribute !== "all" &&
-    artifact.attribute.label !== filters.attribute
-  ) {
-    return false;
-  }
-
-  if (filters.kind !== "all" && artifact.kind.label !== filters.kind) {
-    return false;
-  }
-
-  if (filters.locked === "locked" && !artifact.isLocked) {
-    return false;
-  }
-
-  if (filters.locked === "unlocked" && artifact.isLocked) {
-    return false;
-  }
-
-  if (filters.equipped === "equipped" && artifact.equippedCharacter === null) {
-    return false;
-  }
-
-  if (
-    filters.equipped === "unequipped" &&
-    artifact.equippedCharacter !== null
-  ) {
-    return false;
-  }
-
-  if (filters.rating === "unrated" && (review?.rating ?? 0) !== 0) {
-    return false;
-  }
-
-  if (
-    filters.rating !== "all" &&
-    filters.rating !== "unrated" &&
-    review?.rating !== Number.parseInt(filters.rating, 10)
-  ) {
-    return false;
-  }
-
-  if (filters.lifecycle === "active" && row.presence?.isPossiblyDeleted) {
-    return false;
-  }
-
-  if (
-    filters.lifecycle === "possiblyDeleted" &&
-    !row.presence?.isPossiblyDeleted
-  ) {
-    return false;
-  }
-
-  return true;
-}
-
-function matchesSearchText(artifact: Artifact, searchText: string): boolean {
-  if (artifact.name.toLowerCase().includes(searchText)) {
-    return true;
-  }
-
-  if (artifact.equippedCharacter?.name.toLowerCase().includes(searchText)) {
-    return true;
-  }
-
-  return artifact.skills.some((skill) => {
-    return skill.name.toLowerCase().includes(searchText);
-  });
+  return matchesArtifactFilters(
+    {
+      artifact: row.artifact,
+      customScore: row.customScore.total,
+      rating: row.review?.rating ?? 0,
+      isPossiblyDeleted: row.presence?.isPossiblyDeleted ?? false,
+    },
+    filters,
+  );
 }
 
 function compareArtifacts(
@@ -2468,27 +2920,6 @@ function indexReviewsByOwnedId(
   return result;
 }
 
-function getAttributeOptions(artifacts: Artifact[]): string[] {
-  return Array.from(
-    new Set(artifacts.map((artifact) => artifact.attribute.label)),
-  ).sort((left, right) =>
-    compareOrderedValues(
-      getAttributeOrder(left),
-      getAttributeOrder(right),
-      0,
-      0,
-    ),
-  );
-}
-
-function getKindOptions(artifacts: Artifact[]): string[] {
-  return Array.from(
-    new Set(artifacts.map((artifact) => artifact.kind.label)),
-  ).sort((left, right) =>
-    compareOrderedValues(getKindOrder(left), getKindOrder(right), 0, 0),
-  );
-}
-
 function getAttributeOrder(attributeLabel: string): number {
   const index = ATTRIBUTE_ORDER.indexOf(
     attributeLabel as (typeof ATTRIBUTE_ORDER)[number],
@@ -2520,20 +2951,33 @@ function formatKindLabel(kind: string): string {
   return KIND_LABELS[kind] ?? kind;
 }
 
-function formatSkillQuality(
-  skill: Pick<Artifact["skills"][number], "slot" | "quality">,
+function formatDisplayedSkillQuality(
+  skill: Pick<Artifact["skills"][number], "isMaxQuality" | "quality">,
 ): string {
   const quality = inferTableRank(skill);
-  return quality === undefined ? "" : `${quality.toUpperCase()}. `;
+  return quality?.toUpperCase() ?? "A";
+}
+
+function getHighlightTextColor(backgroundColor: string | undefined): string {
+  if (backgroundColor === undefined) return "inherit";
+  const red = Number.parseInt(backgroundColor.slice(1, 3), 16);
+  const green = Number.parseInt(backgroundColor.slice(3, 5), 16);
+  const blue = Number.parseInt(backgroundColor.slice(5, 7), 16);
+  const luminance = (red * 299 + green * 587 + blue * 114) / 1000;
+  return luminance >= 150 ? "#17202a" : "#ffffff";
 }
 
 function formatScoreRouteLabel(route: ScoreResult["selectedRoute"]): string {
+  if (route === "quirk") {
+    return "クァーキー";
+  }
+
   return route === "ideal" ? "理想" : "優先度";
 }
 
-function downloadCsvFile(csv: string, fileName: string) {
-  const blob = new Blob([`\uFEFF${csv}`], {
-    type: "text/csv;charset=utf-8",
+function downloadJsonFile(json: string, fileName: string) {
+  const blob = new Blob([json], {
+    type: "application/json;charset=utf-8",
   });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -2544,7 +2988,7 @@ function downloadCsvFile(csv: string, fileName: string) {
   URL.revokeObjectURL(url);
 }
 
-function createArtifactCsvFileName(date: Date): string {
+function createArtifactJsonFileName(date: Date): string {
   const year = date.getFullYear();
   const month = padDatePart(date.getMonth() + 1);
   const day = padDatePart(date.getDate());
@@ -2552,7 +2996,7 @@ function createArtifactCsvFileName(date: Date): string {
   const minutes = padDatePart(date.getMinutes());
   const seconds = padDatePart(date.getSeconds());
 
-  return `gbf-artifacts-${year}${month}${day}-${hours}${minutes}${seconds}.csv`;
+  return `gbf-artifacts-${year}${month}${day}-${hours}${minutes}${seconds}.json`;
 }
 
 function formatOptionalNumber(value: number | null): string {

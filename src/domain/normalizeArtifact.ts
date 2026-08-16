@@ -29,6 +29,7 @@ export function normalizeArtifact(
     },
     isLocked: raw.is_locked,
     isMarkedUnnecessaryInGame: raw.is_unnecessary,
+    isQuirk: raw.is_quirk,
     userMark: "none",
     gameScore: {
       attack: raw.score_info.attack_score,

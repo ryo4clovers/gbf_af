@@ -214,7 +214,7 @@ User-configurable inputs:
 * Skill priority order
 * Unwanted skills
 
-The evaluator should calculate two routes and use the higher one:
+The evaluator must first return `100` for artifacts with `is_quirk: true`. For regular artifacts, it should calculate two routes and use the higher one:
 
 ```text
 finalScore =
@@ -260,9 +260,9 @@ Many skills have a skill quality from `A` to `E`, where `A` is highest.
 
 Rules:
 
-* Quality `A` receives the smallest penalty and quality `E` the largest.
+* Quality `A` always receives zero penalty and quality `E` receives the largest penalty.
 * A desired skill with quality `D` should score higher than a low-value skill with quality `E`.
-* Penalties are user-configurable integers from 0 to 25 and satisfy `A <= B <= C <= D <= E`.
+* Penalties for `B` through `E` are user-configurable integers from 0 to 25 and satisfy `A(0) <= B <= C <= D <= E`.
 * Subtraction is floored at zero.
 
 Example:
@@ -406,7 +406,7 @@ export type UnwantedSkillConfig = {
 
 export type ScoreResult = {
   total: number;
-  selectedRoute: "ideal" | "priority";
+  selectedRoute: "quirk" | "ideal" | "priority";
   idealRouteScore: number;
   priorityRouteScore: number;
   reasons: ScoreReason[];

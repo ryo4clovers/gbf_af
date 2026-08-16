@@ -2,7 +2,7 @@
 
 ## 目的
 
-Granblue Fantasy のアーティファクト(AF)情報を、ユーザーがローカルで管理・評価・確認・CSV出力できるようにする。
+Granblue Fantasy のアーティファクト(AF)情報を、ユーザーがローカルで管理・評価・確認・JSON移行できるようにする。
 
 このツールは Chrome Extension として動作するが、GBF のゲーム画面やゲーム状態を操作しない。
 
@@ -21,7 +21,7 @@ Granblue Fantasy のアーティファクト(AF)情報を、ユーザーがロ�
 - Side Panel / Dashboard で管理・表示する
 - rating / memo などのユーザーレビュー情報をローカル保存する
 - 統計情報をローカルデータから計算する
-- CSV をローカルで生成する
+- 移行用JSONをローカルで生成する
 - 将来的に custom score をローカルで計算する
 
 ### 行わないこと
@@ -167,7 +167,7 @@ Dashboard はローカル保存済み artifact の管理画面として動作す
 - artifact list を表示する
 - フィルタできる
 - ソートできる
-- CSV export できる
+- artifact JSONをexport / importできる
 - statistics summary を表示できる
 - rating / memo を編集できる
 - lifecycle filtering ができる
@@ -225,57 +225,18 @@ Dashboard で artifact を並び替えできること。
 - 初期実装では statistics を永続化しない
 - 保存済み artifact と user review metadata から都度計算する
 
-### R-012: CSV Export
+### R-012: Artifact JSON Export / Import
 
-保存済み artifact を CSV として出力できること。
+保存済み artifact、rating / memo、lifecycle status をバージョン付きJSONとして入出力できること。
 
 要件:
 
-- ローカルデータのみからCSVを生成する
+- ローカルデータのみからJSONを生成する
 - 外部サーバーへ送信しない
-- artifact基本情報を出力する
-- skill 1〜4 の情報を出力する
-- game score を出力する
-- rating / memo を出力する
-- lifecycle status を出力する
-- future custom score を出力できる構成にする
-
-初期カラム候補:
-
-- ownedId
-- artifactTypeId
-- name
-- kind
-- attribute
-- level
-- maxLevel
-- locked
-- equippedCharacter
-- lifecycleStatus
-- rating
-- memo
-- gameAttackScore
-- gameDefenseScore
-- gameSpecialScore
-- gameTotalScore
-- customScore
-- skill1Name
-- skill1Level
-- skill1Quality
-- skill1EffectValue
-- skill2Name
-- skill2Level
-- skill2Quality
-- skill2EffectValue
-- skill3Name
-- skill3Level
-- skill3Quality
-- skill3EffectValue
-- skill4Name
-- skill4Level
-- skill4Quality
-- skill4EffectValue
-- scannedAt
+- `format`、`version`、`exportedAt`を含める
+- artifact、review、presenceの完全な構造を保持する
+- import時に構造・型・ID整合性を検証する
+- score settingsなどのアプリ設定は含めない
 
 ### R-013: Display Mode
 
@@ -345,6 +306,8 @@ Phase 1 では、自由数式エディタではなく rule-based scoring とす�
 
 スコア評価:
 
+`is_quirk: true` のアーティファクトは、他の評価より優先して100点とする。
+
 ```text
 finalScore =
   max(
@@ -392,8 +355,8 @@ priorityRouteScore =
 要件:
 
 * A〜E のスキルクオリティを扱い、Aを最高品質、Eを最低品質とすること
-* `A` の減点を最も小さく、`E` の減点を最も大きくする
-* 減点幅は0～25で設定し、`A <= B <= C <= D <= E`を維持する
+* `A`は減点`0`で固定し、`E`の減点を最も大きくする
+* B～Eの減点幅は0～25で設定し、`A(0) <= B <= C <= D <= E`を維持する
 * 減算後のスコアは0未満にしない
 * 「欲しいスキルの d」が「微妙なスキルの e」より高くなるようにする
 
@@ -461,7 +424,7 @@ Route: priority
 * artifact data は IndexedDB に保存する
 * rating / memo は IndexedDB に保存する
 * custom score settings は IndexedDB に保存する
-* CSV はローカルで生成する
+* JSON はローカルで生成する
 * 外部サーバーへ同期しない
 
 ### NFR-003: Maintainability
@@ -473,7 +436,7 @@ API response、domain model、UI、score policy を分離する。
 * API response type と domain model を分ける
 * normalization を UI から分離する
 * score evaluation を UI から分離する
-* CSV generation を UI から分離する
+* JSON serialization / validation を UI から分離する
 * storage access を domain logic から分離する
 * custom score policy と calculated score result を分離する
 
@@ -512,7 +475,7 @@ Manifest V3 の service worker lifecycle を考慮する。
 * Dashboard の統計計算は必要なタイミングで行う
 * 不要な永続化を避ける
 * 不要な polling を行わない
-* 大量の artifact でも filter / sort / CSV export が実用的に動作する
+* 大量の artifact でも filter / sort / JSON export が実用的に動作する
 * custom score evaluator は pure function とし、必要に応じて再計算しやすくする
 
 ### NFR-007: Explainability

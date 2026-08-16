@@ -11,6 +11,8 @@ export type Artifact = {
   attribute: Attribute;
   isLocked: boolean;
   isMarkedUnnecessaryInGame: boolean;
+  /** Optional for compatibility with artifacts stored before quirk support. */
+  isQuirk?: boolean;
   userMark: UserArtifactMark;
   gameScore: GameScore;
   customScore: CustomScore | null;

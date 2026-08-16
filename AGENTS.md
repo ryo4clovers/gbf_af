@@ -197,9 +197,9 @@ Many skills have a skill quality from `A` to `E` at the same skill level. `A` is
 
 Rules:
 
-* Quality `A` receives the smallest penalty and quality `E` the largest.
+* Quality `A` always receives zero penalty and quality `E` receives the largest penalty.
 * A desired skill with quality `D` should score higher than a low-value skill with quality `E`.
-* Users configure integer penalties from 0 to 25 while preserving `A <= B <= C <= D <= E`.
+* Users configure penalties for `B` through `E` from 0 to 25 while preserving `A(0) <= B <= C <= D <= E`.
 * The default penalties are `0 / 1 / 2 / 3 / 4`.
 
 Example:
@@ -280,7 +280,7 @@ Prefer returning a structure like:
 ```ts
 type ScoreResult = {
   total: number;
-  selectedRoute: "ideal" | "priority";
+  selectedRoute: "quirk" | "ideal" | "priority";
   idealRouteScore: number;
   priorityRouteScore: number;
   reasons: ScoreReason[];

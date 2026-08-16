@@ -813,7 +813,8 @@ tbody tr:hover {
 
 .skillList {
   margin: 0;
-  padding-left: 16px;
+  padding: 0;
+  list-style: none;
 }
 
 .customScoreCell {
@@ -847,6 +848,30 @@ tbody tr:hover {
 
 .skillList li + li {
   margin-top: 4px;
+}
+
+.skillList li {
+  display: grid;
+  grid-template-columns: 1.7em minmax(0, 1fr);
+  align-items: start;
+  gap: 2px;
+}
+
+.skillList li.highlightedSkill {
+  margin-inline: -4px;
+  border-radius: 4px;
+  padding: 3px 4px;
+}
+
+.skillList li.highlightedSkill small,
+.skillList li.highlightedSkill .skillQualityMarker {
+  color: inherit;
+}
+
+.skillQualityMarker {
+  color: var(--color-accent-strong);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .ratingSelect {
@@ -1314,6 +1339,7 @@ tbody tr:hover {
 .dashboardTabs {
   gap: 3px;
   margin: 0;
+  border-bottom: 0;
   padding-left: 14px;
   overflow: hidden;
 }
@@ -1450,11 +1476,272 @@ tbody tr:hover {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.artifactFilterEditor {
+  display: grid;
+  gap: 20px;
+}
+
+.filterOptionSection {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.filterOptionSection legend,
+.dualRangeHeader h3,
+.filterSkillSection h3 {
+  margin: 0 0 9px;
+  padding: 0;
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.filterOptionGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(94px, 1fr));
+  gap: 7px;
+}
+
+.filterIconOption {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 7px 8px;
+  background: var(--color-surface-muted);
+  cursor: pointer;
+}
+
+.filterIconOption:has(input:checked) {
+  border-color: var(--color-accent);
+  box-shadow: inset 0 0 0 1px rgba(169, 120, 45, 0.14);
+}
+
+.filterIconOption input,
+.filterSkillOptions input {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+.filterIconOption img {
+  width: 25px;
+  height: 25px;
+  object-fit: contain;
+}
+
+.dualRangeFilter {
+  min-width: 0;
+}
+
+.dualRangeHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dualRangeHeader output {
+  color: var(--color-accent-strong);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.dualRangeControl {
+  position: relative;
+  height: 34px;
+  margin: 0 10px;
+}
+
+.dualRangeRail,
+.dualRangeSelection {
+  position: absolute;
+  top: 15px;
+  height: 4px;
+  border-radius: 999px;
+}
+
+.dualRangeRail {
+  right: 0;
+  left: 0;
+  background: var(--color-border);
+}
+
+.dualRangeSelection {
+  background: var(--color-accent);
+}
+
+.dualRangeControl input[type="range"] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 34px;
+  margin: 0;
+  padding: 0;
+  appearance: none;
+  pointer-events: none;
+  background: transparent;
+}
+
+.dualRangeControl input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  background: transparent;
+}
+
+.dualRangeControl input[type="range"]::-webkit-slider-thumb {
+  width: 18px;
+  height: 18px;
+  margin-top: -7px;
+  border: 2px solid var(--color-surface);
+  border-radius: 50%;
+  appearance: none;
+  pointer-events: auto;
+  background: var(--color-accent);
+  box-shadow: 0 1px 5px rgba(15, 26, 38, 0.3);
+  cursor: grab;
+}
+
+.filterSkillSection {
+  display: grid;
+  gap: 7px;
+}
+
+.filterSkillSection details,
+.filterOtherConditions {
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface-muted);
+}
+
+.filterSkillSection summary,
+.filterOtherConditions summary {
+  padding: 10px 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.filterSkillCondition {
+  border-top: 1px solid var(--color-border);
+  padding: 10px 12px 12px;
+}
+
+.filterSkillTabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.filterSkillTabs button {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.filterSkillTabs button:first-child {
+  border-radius: 5px 0 0 5px;
+}
+
+.filterSkillTabs button:last-child {
+  border-radius: 0 5px 5px 0;
+}
+
+.filterSkillTabs button.active {
+  z-index: 1;
+  border-color: var(--color-accent);
+  color: #fff;
+  background: var(--color-accent-secondary);
+}
+
+.filterSkillOptions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px 14px;
+  max-height: 220px;
+  overflow-y: auto;
+  margin-top: 10px;
+  padding: 8px;
+  background: var(--color-surface);
+}
+
+.filterSkillOptions label {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.filterHint {
+  margin: 8px 0 0;
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.filterOtherConditions .filterGrid {
+  padding: 0 12px 12px;
+}
+
 .dialogActions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
   margin-top: 20px;
+}
+
+.skillHighlightTabs {
+  display: flex;
+  gap: 6px;
+  margin: 14px 0;
+}
+
+.skillHighlightTabs button {
+  flex: 1;
+  min-width: 0;
+}
+
+.skillHighlightTabs button.active {
+  border-color: var(--color-accent);
+  color: var(--color-accent-strong);
+  background: var(--color-surface-muted);
+}
+
+.skillHighlightList {
+  display: grid;
+  gap: 6px;
+  max-height: min(52vh, 520px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.skillHighlightRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: var(--color-surface-muted);
+}
+
+.skillHighlightRow label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.skillHighlightRow input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+.skillHighlightRow input[type="color"] {
+  width: 44px;
+  min-width: 44px;
+  height: 30px;
+  padding: 2px;
 }
 
 .helpLinks {
@@ -1616,5 +1903,19 @@ tbody tr:hover {
 
   .dialogBody .filterGrid {
     grid-template-columns: 1fr;
+  }
+
+  .filterOptionGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filterSkillOptions {
+    grid-template-columns: 1fr;
+  }
+
+  .dualRangeHeader {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0;
   }
 }

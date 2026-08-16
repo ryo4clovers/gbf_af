@@ -10,11 +10,9 @@ const QUALITY_TO_TABLE_RANK: Record<number, TableRank> = {
 };
 
 export function inferTableRank(
-  skill: Pick<ArtifactSkill, "slot" | "quality">,
+  skill: Pick<ArtifactSkill, "isMaxQuality" | "quality">,
 ): TableRank | undefined {
-  if (skill.slot === 4) {
-    return undefined;
-  }
+  if (skill.isMaxQuality) return "a";
 
   return inferSkillQuality(skill.quality);
 }

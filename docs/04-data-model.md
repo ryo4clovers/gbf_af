@@ -358,7 +358,7 @@ type CustomScoreReason = {
 ```ts
 type ScoreResult = {
   total: number;
-  selectedRoute: "ideal" | "priority";
+  selectedRoute: "quirk" | "ideal" | "priority";
   idealRouteScore: number;
   priorityRouteScore: number;
   reasons: ScoreReason[];
@@ -963,7 +963,7 @@ type UnwantedSkillConfig = {
 ```ts
 type ScoreResult = {
   total: number;
-  selectedRoute: "ideal" | "priority";
+  selectedRoute: "quirk" | "ideal" | "priority";
   idealRouteScore: number;
   priorityRouteScore: number;
   reasons: ScoreReason[];
@@ -1074,6 +1074,8 @@ Phase 1 では、まず `skill_quality` ベースを優先し、必要に応じ�
 ## Custom Score Evaluation
 
 最終スコア:
+
+`is_quirk: true` の場合は、以下の通常評価を行わず100点とする。
 
 ```text
 finalScore =

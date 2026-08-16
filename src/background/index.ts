@@ -1,7 +1,6 @@
 import { ZodError } from "zod";
 import { artifactListResponseSchema } from "../api/artifactListSchema";
 import type { ArtifactListResponse } from "../api/artifactListTypes";
-import { isImportedArtifactData } from "../csv/artifactCsv";
 import type { Artifact } from "../domain/artifact";
 import type { ArtifactUserReview } from "../domain/artifactUserReview";
 import {
@@ -19,6 +18,7 @@ import {
   validateTableRankPenalties,
 } from "../domain/score/customScoreSettings";
 import { validateIdealSkillConfigurations } from "../domain/score/idealSkillConfiguration";
+import { isImportedArtifactData } from "../json/artifactDataValidation";
 import type {
   ErrorResponse,
   ExtensionMessage,

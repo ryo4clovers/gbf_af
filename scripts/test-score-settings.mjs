@@ -29,9 +29,24 @@ try {
   const idealEvaluator = require(
     path.join(outputDirectory, "domain/score/evaluateIdealRoute.js"),
   );
-  const csvModule = require(path.join(outputDirectory, "csv/artifactCsv.js"));
+  const customEvaluator = require(
+    path.join(outputDirectory, "domain/score/evaluateCustomScore.js"),
+  );
+  const scoreExplanation = require(
+    path.join(outputDirectory, "domain/score/scoreExplanation.js"),
+  );
+  const artifactDataValidation = require(
+    path.join(outputDirectory, "json/artifactDataValidation.js"),
+  );
+  const jsonModule = require(path.join(outputDirectory, "json/artifactJson.js"));
   const qualityModule = require(
     path.join(outputDirectory, "domain/skill/inferTableRank.js"),
+  );
+  const highlightSettingsModule = require(
+    path.join(outputDirectory, "domain/skill/skillHighlightSettings.js"),
+  );
+  const artifactFiltersModule = require(
+    path.join(outputDirectory, "dashboard/artifactFilters.js"),
   );
   const settings = settingsModule.withCustomScoreSettingsDefaults({
     idealSkillKeys: [],
@@ -94,12 +109,45 @@ try {
     ),
     ["e", "d", "c", "b", "a"],
   );
-  assert.equal(qualityModule.inferTableRank({ slot: 4, quality: 5 }), undefined);
+  assert.equal(
+    qualityModule.inferTableRank({ quality: 1, isMaxQuality: true }),
+    "a",
+  );
+  assert.equal(
+    qualityModule.inferTableRank({ quality: 1, isMaxQuality: false }),
+    "e",
+  );
+  assert.equal(
+    scoreExplanation.getTableRankPenalty(
+      { slot: 4, tableRank: "a" },
+      { a: 10, b: 10, c: 10, d: 10, e: 10 },
+    ),
+    0,
+  );
+  assert.equal(
+    scoreExplanation.getTableRankPenalty(
+      { slot: 1, tableRank: "a" },
+      { a: 10, b: 10, c: 10, d: 10, e: 10 },
+    ),
+    0,
+  );
   assert.deepEqual(
     settingsModule.withCustomScoreSettingsDefaults({
       tableRankPenalties: { a: 4, b: 3, c: 2, d: 1, e: 0 },
     }).tableRankPenalties,
     { a: 0, b: 1, c: 2, d: 3, e: 4 },
+  );
+  assert.deepEqual(
+    highlightSettingsModule.normalizeSkillHighlightSettings({
+      attack_power: "#FFF1A8",
+      hp: "not-a-color",
+      defense: 42,
+    }),
+    { attack_power: "#fff1a8" },
+  );
+  assert.deepEqual(
+    highlightSettingsModule.normalizeSkillHighlightSettings(null),
+    {},
   );
   assert.equal(findScore(settings.skillScores.firstSecondSlot, "attack_power"), 25);
   assert.equal(
@@ -184,6 +232,24 @@ try {
     100,
   );
 
+  const quirkResult = customEvaluator.evaluateCustomScore({
+    artifact: {
+      ...artifact,
+      skills: [],
+      raw: { is_quirk: true },
+    },
+    settings,
+  });
+  assert.equal(quirkResult.total, 100);
+  assert.equal(quirkResult.selectedRoute, "quirk");
+  assert.deepEqual(quirkResult.reasons, [
+    {
+      type: "quirk",
+      label: "クァーキーアーティファクト",
+      delta: 100,
+    },
+  ]);
+
   idealSettings.idealSkillConfigurations[0].firstSecondSlotSkillKeys = [
     null,
     null,
@@ -229,20 +295,35 @@ try {
     lastSeenSessionId: "session-1",
     isPossiblyDeleted: false,
   };
-  const portableCsv = csvModule.convertArtifactRowsToCsv([
+  const artifactJson = jsonModule.createArtifactJson(
     {
-      artifact: portableArtifact,
-      review: portableReview,
-      presence: portablePresence,
+      artifacts: [portableArtifact],
+      reviews: [portableReview],
+      presence: [portablePresence],
     },
-  ]);
-  assert.deepEqual(csvModule.parseArtifactRowsFromCsv(portableCsv), {
+    "2026-08-16T01:04:00.000Z",
+  );
+  assert.deepEqual(jsonModule.parseArtifactJson(artifactJson), {
+    format: "gbf-af-manager",
+    version: 1,
+    exportedAt: "2026-08-16T01:04:00.000Z",
     artifacts: [portableArtifact],
     reviews: [portableReview],
     presence: [portablePresence],
   });
+  assert.throws(
+    () =>
+      jsonModule.parseArtifactJson(
+        JSON.stringify({
+          ...JSON.parse(artifactJson),
+          version: 999,
+        }),
+      ),
+    /未対応のJSONバージョン/,
+  );
+  assert.throws(() => jsonModule.parseArtifactJson("not-json"), /JSONの形式/);
   assert.equal(
-    csvModule.isImportedArtifactData({
+    artifactDataValidation.isImportedArtifactData({
       artifacts: [{ ...portableArtifact, attribute: undefined }],
       reviews: [],
       presence: [],
@@ -261,13 +342,72 @@ try {
     iconImage: "",
     scoreCategory: "attack",
   };
+  const filterArtifact = {
+    ...portableArtifact,
+    skills: [
+      { ...portableSkill, skillId: 10011 },
+      {
+        ...portableSkill,
+        slot: 3,
+        skillId: 30131,
+        name: "通常攻撃ダメージ上限",
+      },
+    ],
+  };
+  const artifactFilters = artifactFiltersModule.createDefaultArtifactFilters();
+  artifactFilters.scoreRange = [40, 90];
+  artifactFilters.ratingRange = [2, 4];
+  artifactFilters.skillConditions[0].firstSecondSlotKeys = [
+    "attack_power",
+    "hp",
+  ];
+  artifactFilters.skillConditions[1].thirdSlotKeys = [
+    "normal_attack_damage_cap",
+  ];
+  assert.equal(
+    artifactFiltersModule.matchesArtifactFilters(
+      {
+        artifact: filterArtifact,
+        customScore: 70,
+        rating: 3,
+        isPossiblyDeleted: false,
+      },
+      artifactFilters,
+    ),
+    true,
+  );
+  assert.equal(
+    artifactFiltersModule.matchesArtifactFilters(
+      {
+        artifact: filterArtifact,
+        customScore: 91,
+        rating: 3,
+        isPossiblyDeleted: false,
+      },
+      artifactFilters,
+    ),
+    false,
+  );
+  artifactFilters.skillConditions[1].thirdSlotKeys = ["ability_damage_cap"];
+  assert.equal(
+    artifactFiltersModule.matchesArtifactFilters(
+      {
+        artifact: filterArtifact,
+        customScore: 70,
+        rating: 3,
+        isPossiblyDeleted: false,
+      },
+      artifactFilters,
+    ),
+    false,
+  );
   for (const invalidSkills of [
     [{ ...portableSkill, slot: "1" }],
     [portableSkill, { ...portableSkill, skillId: 11 }],
     [{ ...portableSkill, parsedValue: { value: "1", unit: "percent" } }],
   ]) {
     assert.equal(
-      csvModule.isImportedArtifactData({
+      artifactDataValidation.isImportedArtifactData({
         artifacts: [{ ...portableArtifact, skills: invalidSkills }],
         reviews: [],
         presence: [],
@@ -276,7 +416,7 @@ try {
     );
   }
   assert.equal(
-    csvModule.isImportedArtifactData({
+    artifactDataValidation.isImportedArtifactData({
       artifacts: [{ ...portableArtifact, customScore: { total: 1 } }],
       reviews: [],
       presence: [],
@@ -284,18 +424,13 @@ try {
     false,
   );
   assert.equal(
-    csvModule.isImportedArtifactData({
+    artifactDataValidation.isImportedArtifactData({
       artifacts: [portableArtifact],
       reviews: [{ ...portableReview, rating: 999 }],
       presence: [portablePresence],
     }),
     false,
   );
-  assert.throws(
-    () => csvModule.parseArtifactRowsFromCsv("ownedId,name\r\n42,test"),
-    /migration data/,
-  );
-
   buildExtension(buildOutputDirectory);
   for (const htmlFile of ["sidepanel.html", "dashboard.html"]) {
     const html = readFileSync(path.join(buildOutputDirectory, htmlFile), "utf8");
@@ -321,8 +456,12 @@ function compileScoreModules(outputDirectory) {
       "src/domain/score/customScoreSettings.ts",
       "src/domain/score/evaluatePriorityRoute.ts",
       "src/domain/score/evaluateIdealRoute.ts",
-      "src/csv/artifactCsv.ts",
+      "src/domain/score/evaluateCustomScore.ts",
+      "src/json/artifactDataValidation.ts",
+      "src/json/artifactJson.ts",
       "src/domain/skill/inferTableRank.ts",
+      "src/domain/skill/skillHighlightSettings.ts",
+      "src/dashboard/artifactFilters.ts",
       "--outDir",
       outputDirectory,
       "--module",

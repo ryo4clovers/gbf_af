@@ -45,7 +45,11 @@ export function getTableRankPenalty(
   skill: Pick<NormalizedArtifactSkill, "slot" | "tableRank">,
   penalties: TableRankPenalties,
 ): number {
-  if (skill.slot === 4 || skill.tableRank === undefined) {
+  if (
+    skill.slot === 4 ||
+    skill.tableRank === undefined ||
+    skill.tableRank === "a"
+  ) {
     return 0;
   }
 

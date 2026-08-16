@@ -128,6 +128,10 @@ export function validateTableRankPenalties(penalties: unknown): string | null {
     return "Skill quality penalties must be integers from 0 to 25.";
   }
 
+  if (values[0] !== 0) {
+    return "Skill quality A must not have a penalty.";
+  }
+
   for (let index = 1; index < values.length; index += 1) {
     const previousValue = values[index - 1];
     const currentValue = values[index];
@@ -155,15 +159,17 @@ function normalizeTableRankPenalties(
     merged.d >= merged.e &&
     (merged.a > merged.e || merged.b > merged.d);
 
-  if (!isLegacyDescending) return merged;
+  const normalized = isLegacyDescending
+    ? {
+        a: merged.e,
+        b: merged.d,
+        c: merged.c,
+        d: merged.b,
+        e: merged.a,
+      }
+    : merged;
 
-  return {
-    a: merged.e,
-    b: merged.d,
-    c: merged.c,
-    d: merged.b,
-    e: merged.a,
-  };
+  return { ...normalized, a: 0 };
 }
 
 export function validateSkillScores(skillScores: unknown): string | null {

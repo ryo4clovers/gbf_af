@@ -64,7 +64,7 @@ Chrome Extension
 │  ├─ statistics
 │  ├─ rating / memo
 │  ├─ lifecycle filtering
-│  ├─ CSV export
+│  ├─ JSON export / import
 │  └─ future custom score settings
 ├─ Background Service Worker
 │  ├─ app mode state
@@ -89,7 +89,7 @@ Chrome Extension
    ├─ artifact model
    ├─ lifecycle model
    ├─ statistics
-   ├─ CSV conversion
+   ├─ JSON serialization / validation
    └─ future custom score evaluator
 ```
 
@@ -220,7 +220,7 @@ Responsibilities:
 * show statistics
 * edit rating / memo
 * filter lifecycle status
-* export CSV
+* export / import artifact JSON
 * eventually show custom score and score reasons
 * edit the single custom score settings record
 
@@ -273,7 +273,7 @@ Dashboard loads user review metadata
   ↓
 Dashboard calculates in-memory statistics
   ↓
-User filters / sorts / edits rating / memo / exports CSV
+User filters / sorts / edits rating / memo / exports JSON
 ```
 
 ### Display Flow
@@ -464,7 +464,7 @@ Responsibilities:
 * preserve raw response where useful
 * expose normalized skill information
 * keep game score separate from custom score
-* support CSV export
+* support artifact JSON export / import
 
 ### User Review Model
 
@@ -532,6 +532,8 @@ User-configurable inputs:
 
 Evaluation:
 
+Artifacts with `is_quirk: true` short-circuit evaluation with a final score of `100`.
+
 ```text
 finalScore =
   max(
@@ -574,12 +576,12 @@ Rules:
 
 ### Skill Quality
 
-Skill quality is a configurable fixed penalty on skill base score. `A` is the highest quality and receives the smallest penalty.
+Skill quality is a fixed penalty on skill base score. `A` is the highest quality and always receives zero penalty; users configure only `B` through `E`.
 
 Reason:
 
-* rank `a` receives a larger penalty than rank `e`
-* but a desired skill with rank `d` should beat a low-value skill with rank `e`
+* quality `A` is never penalized
+* a desired skill with quality `D` should beat a low-value skill with quality `E`
 
 ### Skill Level Baseline
 
@@ -604,22 +606,21 @@ Currently expected statistics:
 
 Do not persist statistics unless a clear performance need appears.
 
-## CSV Architecture
+## Artifact JSON Transfer Architecture
 
-CSV export uses local stored data only.
+JSON export uses local stored data only.
 
-CSV generation should be separated from UI components.
+JSON serialization and validation should be separated from UI components.
 
 Responsibilities:
 
-* define columns
-* format artifact fields
-* format skill fields
+* define the versioned document envelope
+* preserve artifact and skill structures
 * include review metadata
 * include lifecycle status
-* include future custom score if available
+* reject malformed or unsupported documents
 
-CSV export must not send data externally.
+JSON export must not send data externally. CSV is not supported.
 
 ## Content Bridge Recovery
 
@@ -695,7 +696,7 @@ src/
 │  └─ artifactMemoryStorage.ts
 ├─ content/
 │  └─ index.ts
-├─ csv/
+├─ json/
 ├─ dashboard/
 ├─ domain/
 │  ├─ artifact.ts
@@ -739,6 +740,6 @@ src/domain/skill/
 * Keep custom score policy separate from calculated score result.
 * Keep Dashboard management behavior separate from Side Panel display behavior.
 * Keep display mode read-only with respect to artifact persistence / lifecycle.
-* Prefer pure functions for scoring, filtering, sorting, statistics, and CSV formatting.
+* Prefer pure functions for scoring, filtering, sorting, statistics, and JSON validation.
 * Prefer explicit message types for extension communication.
 * Avoid broad abstractions until repeated patterns are proven.

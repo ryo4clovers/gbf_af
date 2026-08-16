@@ -19,7 +19,7 @@ Popup は Side Panel へ移行済みのため、現在の主要UIとしては扱
 - Dashboard で保存済み artifact を管理する
 - rating / memo をローカルに保存する
 - statistics を表示する
-- CSV export と、同CSVを使ったローカルデータ移行用 import を提供する
+- JSON export / importによるローカルアーティファクトデータ移行を提供する
 - custom score の表示・設定を将来的に提供する
 
 ### 行わないこと
@@ -48,7 +48,7 @@ Chrome Extension UI
    ├─ Artifact Table
    ├─ Rating / Memo Editing
    ├─ Lifecycle Filtering
-   ├─ CSV Export
+   ├─ JSON Export / Import
    └─ Future Custom Score Settings
 ````
 
@@ -133,7 +133,7 @@ Side Panelのヘッダーは、Material Icon付きのDashboard導線を提供す
 注意:
 
 * Side Panelには独立したmanage modeを設けない
-* 一覧・フィルタ・CSV・詳細管理は Dashboard に集約する
+* 一覧・フィルタ・JSON移行・詳細管理は Dashboard に集約する
 
 ### display
 
@@ -219,7 +219,7 @@ Dashboard は保存済み artifact の管理画面。
 * rating / memo を編集する
 * lifecycle 状態を確認する
 * statistics を確認する
-* CSV export する
+* JSON export / importする
 * custom score を表示・設定する
 
 ### 起動
@@ -240,7 +240,7 @@ Dashboard
 │  ├─ Title
 │  ├─ Stored Artifact Count
 │  ├─ Latest Scan Info
-│  └─ CSV Export
+│  └─ JSON Export / Import
 ├─ Summary Cards
 │  ├─ Total Count
 │  ├─ Active Count
@@ -287,7 +287,7 @@ Dashboard
 * stored artifact count
 * latest scanned at
 * latest scan session status
-* CSV export button
+* JSON export / import buttons
 * reload local data button
 
 注意:
@@ -547,26 +547,26 @@ S4 回復アビリティ使用時... q1 4%
 * `ownedId` で紐付ける
 * artifact persistence と分離する
 
-## CSV Export UI
+## Artifact JSON Export / Import UI
 
 ### 目的
 
-保存済み artifact をローカル CSV として出力する。
+保存済み artifact、review、presenceをローカルJSONとして入出力する。
 
-The exported CSV keeps human-readable spreadsheet columns and adds migration JSON columns that fully preserve artifacts, reviews, and presence records. Import validates these migration columns and merges records into local storage by `ownedId`.
+The versioned JSON document fully preserves artifacts, reviews, and presence records. Import validates the document structure and merges records into local storage by `ownedId`. CSV is not supported.
 
 ### UI
 
 ```text
-CSV Export
+Artifact JSON Transfer
 ├─ Export Button
-├─ Optional Column Settings
+├─ Import Button
 └─ Export Status
 ```
 
 初期は単一ボタンで十分。
 
-### 出力候補
+### 出力対象
 
 * basic artifact info
 * lifecycle status
@@ -692,8 +692,8 @@ HP                  [------●---] 15
 仕様:
 
 * スコア設定画面の独立した「共通補正」エリアからDialogを開く
-* `A`～`E`の減点幅を0～25の整数スライダーで調整する
-* `A <= B <= C <= D <= E`を保存時に検証する
+* `A`は減点`0`の無効化された表示とし、`B`～`E`だけを0～25の整数スライダーで調整する
+* `A(0) <= B <= C <= D <= E`を保存時に検証する
 * 初期値は`0 / 1 / 2 / 3 / 4`とする
 * 減算後の各スコアは0未満にしない
 * 4枠、ランク不明、理想構成の未選択枠には減点しない
@@ -902,7 +902,7 @@ Could not save local artifact data.
 * loading artifacts
 * loading reviews
 * calculating statistics
-* exporting CSV
+* exporting JSON
 * future calculating custom scores
 
 ## Accessibility / Usability
@@ -925,7 +925,7 @@ UI component に business logic を詰め込みすぎない。
 避けること:
 
 * component 内で score calculation を直接実装する
-* component 内で CSV文字列を直接組み立てる
+* component 内でJSON文字列を直接組み立てる
 * component 内で IndexedDB を直接扱う
 * component 内で normalization を行う
 

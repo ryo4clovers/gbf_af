@@ -294,16 +294,15 @@ const QUALITY_TO_SKILL_QUALITY = {
 
 注意:
 
-* 第4スキルは A〜E skill quality として扱わない可能性が高い
-* slot 4 は `tableRank: undefined` または別扱いにする
-* 実データ検証後に補正する
+* `is_max_quality: true`はslotに関係なくskill quality Aとして扱う
+* slot 4は表示上Aとするが、skill-quality penaltyの対象外とする
 
 ### Validation
 
 * known skillId が stable normalizedKey に変換される
 * unknown skillId でも fallback key が生成される
-* slot 1〜3 の quality が tableRank に変換される
-* slot 4 の tableRank を誤って高評価しない
+* slot 1〜4の`is_max_quality: true`がskill quality Aに変換される
+* slot 4にskill-quality penaltyを適用しない
 * `npm run check` が通る
 
 ## Phase 2: Score Model Definition
@@ -354,7 +353,7 @@ export type UnwantedSkillConfig = {
 
 export type ScoreResult = {
   total: number;
-  selectedRoute: "ideal" | "priority";
+  selectedRoute: "quirk" | "ideal" | "priority";
   idealRouteScore: number;
   priorityRouteScore: number;
   reasons: ScoreReason[];
@@ -424,6 +423,8 @@ src/domain/score/
 ```
 
 ### 評価式
+
+`is_quirk: true` の場合は評価式を短絡し、最終スコアを100とする。
 
 ```text id="rk5jwl"
 finalScore =
@@ -1042,15 +1043,15 @@ Mitigation:
 Mitigation:
 
 * floor each adjusted score at zero
-* keep skill-quality penalties configurable from 0 to 25
-* validate `A <= B <= C <= D <= E`
+* keep skill-quality penalties for B through E configurable from 0 to 25
+* validate `A(0) <= B <= C <= D <= E`
 
 ### Risk: skill quality overpowers skill priority
 
 Mitigation:
 
 * skill quality is a small fixed subtraction from skill score
-* validate `A <= B <= C <= D <= E`
+* validate `A(0) <= B <= C <= D <= E`
 * test desired skill quality D > minor skill quality E
 
 ## Done Criteria for Custom Score Phase 1

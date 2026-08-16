@@ -261,7 +261,8 @@ type RawArtifactSkill = {
 
 * 第1〜第3スキルでは、スキルクオリティ A〜E の推定に使える
 * `1` が低く、`5` が高い品質として扱える可能性がある
-* 第4スキルでは `is_max_quality: true` で固定的に見えるケースがあるため、同じ意味として扱わないよう注意する
+* `is_max_quality: true`の場合は数値にかかわらず最高品質`A`として扱う
+* 第4スキルは`is_max_quality: true`であり、表示上は`A`として扱う。ただしスコア減点の対象外とする
 
 暫定変換候補:
 
@@ -334,7 +335,7 @@ Custom Score Phase 1 では、評価基準は Lv1 baseline とする。
 
 注意:
 
-* `is_max_quality: true` が必ず custom score 上の最高評価を意味するとは限らない
+* `is_max_quality: true` はスキルクオリティ`A`として扱う。第4枠のみクオリティ減点を適用しない
 * 第4スキルでは品質仕様が異なる可能性がある
 
 ### `effect_value`

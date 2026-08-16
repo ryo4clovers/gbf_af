@@ -13,6 +13,22 @@ export type EvaluateCustomScoreInput = {
 export function evaluateCustomScore(
   input: EvaluateCustomScoreInput,
 ): ScoreResult {
+  if (input.artifact.isQuirk === true || input.artifact.raw.is_quirk === true) {
+    return {
+      total: 100,
+      selectedRoute: "quirk",
+      idealRouteScore: 0,
+      priorityRouteScore: 0,
+      reasons: [
+        {
+          type: "quirk",
+          label: "クァーキーアーティファクト",
+          delta: 100,
+        },
+      ],
+    };
+  }
+
   const skills = normalizeArtifactSkills(input.artifact.skills);
   const idealRoute = evaluateIdealRoute({
     artifact: input.artifact,

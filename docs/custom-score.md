@@ -21,9 +21,9 @@ Phase 1 requires the user to define:
 
 ## Artifact Evaluation Model
 
-An artifact has 4 skills.
+An artifact has 4 skills. A quirk artifact (`is_quirk: true`) always receives a final score of `100`; no route calculation or skill-quality penalty can lower it.
 
-The score is calculated using two routes:
+For a regular artifact, the score is calculated using two routes:
 
 ```text
 finalScore =
@@ -86,8 +86,8 @@ Many skills have a quality from `A` to `E`, where `A` is highest and `E` is lowe
 
 Rules:
 
-* Quality `A` receives the smallest penalty and quality `E` the largest.
-* Users configure integer penalties from 0 to 25 with `A <= B <= C <= D <= E`.
+* Quality `A` always receives no penalty and quality `E` receives the largest penalty.
+* Users configure penalties for `B` through `E` from 0 to 25 with `A(0) <= B <= C <= D <= E`.
 * Scores are floored at zero after subtraction.
 
 Example:
@@ -144,7 +144,7 @@ Reasoning:
 
 * Table quality matters.
 * Skill identity should matter more than table quality.
-* Users may choose integer penalties from 0 to 25 while preserving `A <= B <= C <= D <= E`.
+* Users may choose penalties for `B` through `E` from 0 to 25 while preserving `A(0) <= B <= C <= D <= E`.
 * Unknown ranks, slot 4, and ideal-route wildcards receive no penalty.
 
 ## Conceptual Types
@@ -181,7 +181,7 @@ type SkillScores = {
 
 type ScoreResult = {
   total: number;
-  selectedRoute: "ideal" | "priority";
+  selectedRoute: "quirk" | "ideal" | "priority";
   idealRouteScore: number;
   priorityRouteScore: number;
   reasons: ScoreReason[];
